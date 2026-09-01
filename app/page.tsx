@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TapixxoBrand } from "@/app/components/tapixxo-brand";
 
 export default function HomePage() {
   return (
@@ -9,9 +10,8 @@ export default function HomePage() {
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 lg:px-8">
 
-          <Link href="/" className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-400 text-sm text-black">T</span>
-            Tapixxo
+          <Link href="/" aria-label="Tapixxo">
+            <TapixxoBrand priority />
           </Link>
 
           <Link

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { TapixxoBrand } from "@/app/components/tapixxo-brand";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -96,14 +97,8 @@ export default function LoginPage() {
       <div className="tapixxo-enter w-full max-w-md">
 
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-orange-400/30 bg-orange-400/10 text-lg font-semibold text-orange-300 shadow-[0_0_30px_rgba(255,122,26,0.12)]">
-            T
-          </div>
+          <TapixxoBrand className="mb-5" priority />
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-orange-300">Espacio de trabajo</p>
-          <h1 className="mt-2 text-4xl font-semibold tracking-tight">
-            Tapixxo
-          </h1>
-
           <p className="mt-2 text-sm text-gray-400">
             Panel de administración
           </p>

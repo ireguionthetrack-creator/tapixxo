@@ -3,17 +3,21 @@
 import {
   FormEvent,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { SignOutButton } from "@/app/components/sign-out-button";
+import { CompanyAvatar } from "@/app/components/company-avatar";
+import { CompanyAvatarUpload } from "@/app/components/company-avatar-upload";
 
 type Company = {
   id: string;
   name: string;
   created_at: string;
+  profile_image_path: string | null;
 };
 
 type Group = {
@@ -21,6 +25,12 @@ type Group = {
   name: string;
   description: string | null;
   created_at: string;
+};
+
+type ReassignmentGroup = {
+  id: string;
+  name: string;
+  company_id: string;
 };
 
 type Code = {
@@ -48,12 +58,20 @@ export default function CompanyPage() {
   const [scanCounts, setScanCounts] =
     useState<Record<string, number>>({});
 
+  const [scanCountsAvailable, setScanCountsAvailable] =
+    useState(false);
+
   const [role, setRole] = useState<
     "admin" | "company" | null
   >(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState(0);
+  const avatarButtonRef = useRef<HTMLButtonElement>(null);
+  const [avatarMenuPosition, setAvatarMenuPosition] =
+    useState({ top: 0, left: 0 });
 
   const [showGroupForm, setShowGroupForm] =
     useState(false);
@@ -97,11 +115,23 @@ export default function CompanyPage() {
   const [editingActive, setEditingActive] =
     useState(true);
 
-  const [editingGroupId, setEditingGroupId] =
-    useState("");
-
   const [savingEdit, setSavingEdit] =
     useState(false);
+
+  const [reassignmentCompanies, setReassignmentCompanies] =
+    useState<Array<Pick<Company, "id" | "name">>>([]);
+
+  const [reassignmentGroups, setReassignmentGroups] =
+    useState<ReassignmentGroup[]>([]);
+
+  const [reassignmentCompanyId, setReassignmentCompanyId] =
+    useState("");
+
+  const [reassignmentGroupId, setReassignmentGroupId] =
+    useState("");
+
+  const [savingCodeAction, setSavingCodeAction] =
+    useState<string | null>(null);
 
   /*
    * ----------------------------------------------------
@@ -149,7 +179,7 @@ export default function CompanyPage() {
      */
     if (profile.role === "admin") {
       setRole("admin");
-      return true;
+      return "admin";
     }
 
     /*
@@ -168,7 +198,7 @@ export default function CompanyPage() {
         return false;
       }
 
-      return true;
+      return "company";
     }
 
     /*
@@ -188,11 +218,28 @@ export default function CompanyPage() {
   async function loadCompany() {
     const { data, error } = await supabase
       .from("companies")
-      .select("id, name, created_at")
+      .select("id, name, created_at, profile_image_path")
       .eq("id", companyId)
       .single();
 
     if (error) {
+      if (error.code === "42703") {
+        const { data: fallbackCompany, error: fallbackError } =
+          await supabase
+            .from("companies")
+            .select("id, name, created_at")
+            .eq("id", companyId)
+            .single();
+
+        if (!fallbackError && fallbackCompany) {
+          setCompany({
+            ...fallbackCompany,
+            profile_image_path: null,
+          });
+          return;
+        }
+      }
+
       setError(error.message);
       return;
     }
@@ -286,73 +333,54 @@ export default function CompanyPage() {
    */
 
   async function loadScanCounts() {
-    const {
-      data: groupData,
-      error: groupError,
-    } = await supabase
-      .from("code_groups")
-      .select("id")
-      .eq("company_id", companyId);
+    const response = await fetch(
+      `/api/companies/${companyId}/scan-counts`
+    );
+    const result = await response.json();
 
-    if (groupError) {
-      setError(groupError.message);
-      return;
-    }
-
-    const groupIds =
-      (groupData ?? []).map(
-        (group) => group.id
-      );
-
-    if (groupIds.length === 0) {
+    if (!response.ok) {
       setScanCounts({});
+      setScanCountsAvailable(false);
       return;
     }
 
-    const {
-      data: codesData,
-      error: codesError,
-    } = await supabase
-      .from("codes")
-      .select("id")
-      .in("group_id", groupIds);
+    setScanCounts(result.counts ?? {});
+    setScanCountsAvailable(true);
+  }
 
-    if (codesError) {
-      setError(codesError.message);
+  async function loadReassignmentOptions() {
+    const response = await fetch("/api/admin/code-options");
+    const result = await response.json();
+
+    if (response.ok && (result.companies ?? []).length > 0) {
+      setReassignmentCompanies(result.companies ?? []);
+      setReassignmentGroups(result.groups ?? []);
       return;
     }
 
-    const codeIds =
-      (codesData ?? []).map(
-        (code) => code.id
+    const [companiesResult, groupsResult] = await Promise.all([
+      supabase
+        .from("companies")
+        .select("id, name")
+        .order("name", { ascending: true }),
+      supabase
+        .from("code_groups")
+        .select("id, name, company_id")
+        .order("name", { ascending: true }),
+    ]);
+
+    if (companiesResult.error || groupsResult.error) {
+      setError(
+        result.error ??
+          companiesResult.error?.message ??
+          groupsResult.error?.message ??
+          "No se pudieron cargar las opciones de reasignación."
       );
-
-    if (codeIds.length === 0) {
-      setScanCounts({});
       return;
     }
 
-    const {
-      data: scansData,
-      error: scansError,
-    } = await supabase
-      .from("code_scans")
-      .select("code_id")
-      .in("code_id", codeIds);
-
-    if (scansError) {
-      setError(scansError.message);
-      return;
-    }
-
-    const counts: Record<string, number> = {};
-
-    for (const scan of scansData ?? []) {
-      counts[scan.code_id] =
-        (counts[scan.code_id] ?? 0) + 1;
-    }
-
-    setScanCounts(counts);
+    setReassignmentCompanies(companiesResult.data ?? []);
+    setReassignmentGroups(groupsResult.data ?? []);
   }
 
   /*
@@ -374,18 +402,24 @@ export default function CompanyPage() {
     setLoading(true);
     setError("");
 
-    const hasAccess = await checkAccess();
+    const accessRole = await checkAccess();
 
-    if (!hasAccess) {
+    if (!accessRole) {
       return;
     }
 
-    await Promise.all([
+    const loadRequests = [
       loadCompany(),
       loadGroups(),
       loadCodes(),
       loadScanCounts(),
-    ]);
+    ];
+
+    if (accessRole === "admin") {
+      loadRequests.push(loadReassignmentOptions());
+    }
+
+    await Promise.all(loadRequests);
 
     setLoading(false);
   }
@@ -401,6 +435,38 @@ export default function CompanyPage() {
     // The company ID is the query identity; helpers intentionally use current state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
+
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+
+    const closeAvatarMenu = () => setAvatarMenuOpen(false);
+
+    window.addEventListener("scroll", closeAvatarMenu, true);
+    window.addEventListener("resize", closeAvatarMenu);
+
+    return () => {
+      window.removeEventListener("scroll", closeAvatarMenu, true);
+      window.removeEventListener("resize", closeAvatarMenu);
+    };
+  }, [avatarMenuOpen]);
+
+  function toggleAvatarMenu() {
+    if (avatarMenuOpen) {
+      setAvatarMenuOpen(false);
+      return;
+    }
+
+    const bounds = avatarButtonRef.current?.getBoundingClientRect();
+
+    if (bounds) {
+      setAvatarMenuPosition({
+        top: bounds.bottom + 12,
+        left: Math.max(16, bounds.left),
+      });
+    }
+
+    setAvatarMenuOpen(true);
+  }
 
   /*
    * ----------------------------------------------------
@@ -506,29 +572,36 @@ export default function CompanyPage() {
       })
     );
 
-    const { error } = await supabase
-      .from("codes")
-      .insert(newCodes);
+    try {
+      const response = await fetch("/api/admin/codes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codes: newCodes }),
+      });
+      const result = await response.json();
 
-    if (error) {
-      if (error.code === "23505") {
-        setError(
-          "Uno o más códigos ya existen. Cambia el número inicial."
-        );
+      if (!response.ok) {
+        if (result.code === "23505") {
+          setError(
+            "Uno o más códigos ya existen. Cambia el número inicial."
+          );
+        } else {
+          setError(result.error ?? "No se pudieron generar los códigos.");
+        }
       } else {
-        setError(error.message);
+        setShowCodeForm(false);
+        setCodeDestination("");
+        setCodeQuantity(10);
+        setError("");
+
+        await loadCodes();
+        await loadScanCounts();
       }
-    } else {
-      setShowCodeForm(false);
-      setCodeDestination("");
-      setCodeQuantity(10);
-      setError("");
-
-      await loadCodes();
-      await loadScanCounts();
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setSavingCodes(false);
     }
-
-    setSavingCodes(false);
   }
 
   /*
@@ -536,7 +609,8 @@ export default function CompanyPage() {
    * EDITAR CÓDIGO
    * ----------------------------------------------------
    *
-   * Admin y company pueden hacerlo.
+   * Admin y company pueden actualizar destino y estado.
+   * La reasignación de grupo/empresa se procesa en la API exclusiva de admin.
    */
 
   async function updateCode(
@@ -553,7 +627,7 @@ export default function CompanyPage() {
 
     /*
      * Nunca permitimos cambiar el código.
-     * Solo destino, estado y grupo.
+     * Solo destino y estado.
      */
 
     const { error } = await supabase
@@ -563,9 +637,6 @@ export default function CompanyPage() {
           editingDestination.trim() || null,
 
         active: editingActive,
-
-        group_id:
-          editingGroupId || null,
       })
       .eq("id", editingCodeId);
 
@@ -575,12 +646,92 @@ export default function CompanyPage() {
       setEditingCodeId(null);
       setEditingDestination("");
       setEditingActive(true);
-      setEditingGroupId("");
+      setReassignmentCompanyId("");
+      setReassignmentGroupId("");
 
       await loadCodes();
     }
 
     setSavingEdit(false);
+  }
+
+  async function reassignCode() {
+    if (role !== "admin" || !editingCodeId) {
+      setError("No tienes permisos para reasignar códigos.");
+      return;
+    }
+
+    if (!reassignmentCompanyId || !reassignmentGroupId) {
+      setError("Selecciona la empresa y el grupo de destino.");
+      return;
+    }
+
+    setSavingCodeAction(editingCodeId);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/admin/codes/${editingCodeId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetGroupId: reassignmentGroupId }),
+        }
+      );
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error ?? "No se pudo reasignar el código.");
+        return;
+      }
+
+      setEditingCodeId(null);
+      setReassignmentCompanyId("");
+      setReassignmentGroupId("");
+      await Promise.all([loadCodes(), loadScanCounts()]);
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setSavingCodeAction(null);
+    }
+  }
+
+  async function deleteCode(code: Code) {
+    if (role !== "admin") {
+      setError("No tienes permisos para eliminar códigos.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `¿Eliminar el código ${code.code}? También se eliminarán sus escaneos y esta acción no se puede deshacer.`
+    );
+
+    if (!confirmed) return;
+
+    setSavingCodeAction(code.id);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/codes/${code.id}`, {
+        method: "DELETE",
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error ?? "No se pudo eliminar el código.");
+        return;
+      }
+
+      if (editingCodeId === code.id) {
+        setEditingCodeId(null);
+      }
+
+      await Promise.all([loadCodes(), loadScanCounts()]);
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setSavingCodeAction(null);
+    }
   }
 
   /*
@@ -633,28 +784,50 @@ export default function CompanyPage() {
 
       <header className="border-b border-white/[0.08] bg-black/20 px-5 py-5 backdrop-blur-sm md:px-8">
 
-        <Link
-          href="/companies"
-          className="text-sm text-gray-400 transition hover:text-orange-300"
-        >
-          ← Empresas
-        </Link>
+        {role === "admin" && (
+          <Link
+            href="/companies"
+            className="text-sm text-gray-400 transition hover:text-orange-300"
+          >
+            ← Empresas
+          </Link>
+        )}
 
         <div className="mx-auto mt-4 flex max-w-7xl flex-col gap-4 md:flex-row md:items-end md:justify-between">
 
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-orange-300">Centro de gestión</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">
-              {company.name}
-            </h1>
+          <div className="flex items-center gap-4">
+            <div>
+              <button
+                ref={avatarButtonRef}
+                type="button"
+                onClick={toggleAvatarMenu}
+                aria-label="Editar logo de empresa"
+                aria-expanded={avatarMenuOpen}
+                className="rounded-2xl outline-none transition hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-orange-400"
+              >
+                <CompanyAvatar
+                  name={company.name}
+                  imagePath={company.profile_image_path}
+                  size="lg"
+                  version={avatarVersion}
+                />
+              </button>
 
-            {/* SOLO ADMIN VE EL ID */}
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-orange-300">Centro de gestión</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">
+                {company.name}
+              </h1>
 
-            {role === "admin" && (
-              <p className="mt-1 text-sm text-gray-500">
-                ID: {company.id}
-              </p>
-            )}
+              {/* SOLO ADMIN VE EL ID */}
+
+              {role === "admin" && (
+                <p className="mt-1 text-sm text-gray-500">
+                  ID: {company.id}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -670,6 +843,40 @@ export default function CompanyPage() {
         </div>
 
       </header>
+
+      {avatarMenuOpen && (
+        <div
+          className="fixed inset-0 z-50"
+          onMouseDown={() => setAvatarMenuOpen(false)}
+          onWheel={() => setAvatarMenuOpen(false)}
+        >
+          <div
+            className="absolute w-[min(24rem,calc(100vw-2rem))] rounded-2xl bg-[#141514] shadow-2xl"
+            style={avatarMenuPosition}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <CompanyAvatarUpload
+              companyId={companyId}
+              companyName={company.name}
+              imagePath={company.profile_image_path}
+              canManage={role === "admin" || role === "company"}
+              version={avatarVersion}
+              onClose={() => setAvatarMenuOpen(false)}
+              onImageChange={(imagePath) => {
+                setCompany((currentCompany) =>
+                  currentCompany
+                    ? {
+                        ...currentCompany,
+                        profile_image_path: imagePath,
+                      }
+                    : currentCompany
+                );
+                setAvatarVersion(Date.now());
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="mx-auto max-w-7xl p-5 md:p-8">
 
@@ -703,11 +910,12 @@ export default function CompanyPage() {
             </p>
 
             <p className="mt-3 text-3xl font-semibold tracking-tight">
-              {Object.values(scanCounts).reduce(
-                (total, count) =>
-                  total + count,
-                0
-              )}
+              {scanCountsAvailable
+                ? Object.values(scanCounts).reduce(
+                    (total, count) => total + count,
+                    0
+                  )
+                : "—"}
             </p>
           </div>
 
@@ -1089,16 +1297,13 @@ export default function CompanyPage() {
                               </p>
 
                               <p className="mt-2 text-sm text-gray-400">
-                                {scanCounts[
-                                  code.id
-                                ] ?? 0}{" "}
-                                {
-                                  scanCounts[
-                                    code.id
-                                  ] === 1
-                                    ? "escaneo"
-                                    : "escaneos"
-                                }
+                                {scanCountsAvailable
+                                  ? `${scanCounts[code.id] ?? 0} ${
+                                      scanCounts[code.id] === 1
+                                        ? "escaneo"
+                                        : "escaneos"
+                                    }`
+                                  : "Escaneos no disponibles"}
                               </p>
 
                               {code.destination_url && (
@@ -1127,10 +1332,8 @@ export default function CompanyPage() {
                                       ""
                                   );
 
-                                  setEditingGroupId(
-                                    code.group_id ??
-                                      ""
-                                  );
+                                  setReassignmentCompanyId("");
+                                  setReassignmentGroupId("");
 
                                   setEditingActive(
                                     code.active
@@ -1153,6 +1356,19 @@ export default function CompanyPage() {
                                 Copiar URL
                               </button>
 
+                              {role === "admin" && (
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteCode(code)}
+                                  disabled={savingCodeAction === code.id}
+                                  className="rounded-lg border border-red-400/30 px-3 py-2 text-sm text-red-300 transition hover:border-red-400/60 hover:bg-red-400/10 disabled:opacity-50"
+                                >
+                                  {savingCodeAction === code.id
+                                    ? "Eliminando..."
+                                    : "Eliminar"}
+                                </button>
+                              )}
+
                             </div>
 
                             {/* FORMULARIO EDICIÓN */}
@@ -1168,55 +1384,6 @@ export default function CompanyPage() {
                               >
 
                                 <div className="grid gap-4">
-
-                                  <div>
-
-                                    <label className="mb-2 block text-sm text-gray-400">
-                                      Grupo
-                                    </label>
-
-                                    <select
-                                      value={
-                                        editingGroupId
-                                      }
-                                      onChange={(
-                                        event
-                                      ) =>
-                                        setEditingGroupId(
-                                          event
-                                            .target
-                                            .value
-                                        )
-                                      }
-                                      className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-orange-400/60"
-                                    >
-
-                                      <option value="">
-                                        Sin grupo
-                                      </option>
-
-                                      {groups.map(
-                                        (
-                                          group
-                                        ) => (
-                                          <option
-                                            key={
-                                              group.id
-                                            }
-                                            value={
-                                              group.id
-                                            }
-                                          >
-                                            {
-                                              group.name
-                                            }
-                                          </option>
-                                        )
-                                      )}
-
-                                    </select>
-
-                                  </div>
 
                                   <div>
 
@@ -1266,6 +1433,96 @@ export default function CompanyPage() {
 
                                   </label>
 
+                                  {role === "admin" && (
+                                    <div className="rounded-xl border border-orange-400/20 bg-orange-400/[0.03] p-4">
+                                      <p className="text-sm font-medium text-orange-200">
+                                        Reasignar a otra empresa
+                                      </p>
+
+                                      <p className="mt-1 text-xs text-gray-400">
+                                        Esta acción solo está disponible para administradores.
+                                      </p>
+
+                                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                                        <div>
+                                          <label className="mb-2 block text-sm text-gray-400">
+                                            Empresa destino
+                                          </label>
+
+                                          <select
+                                            value={reassignmentCompanyId}
+                                            onChange={(event) => {
+                                              setReassignmentCompanyId(event.target.value);
+                                              setReassignmentGroupId("");
+                                            }}
+                                            className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-orange-400/60"
+                                          >
+                                            <option value="">
+                                              Seleccionar empresa
+                                            </option>
+
+                                            {reassignmentCompanies.map(
+                                              (targetCompany) => (
+                                                <option key={targetCompany.id} value={targetCompany.id}>
+                                                  {targetCompany.id === companyId
+                                                    ? `${targetCompany.name} (empresa actual)`
+                                                    : targetCompany.name}
+                                                </option>
+                                              )
+                                            )}
+                                          </select>
+
+                                          {reassignmentCompanies.length <= 1 && (
+                                            <p className="mt-2 text-xs text-gray-500">
+                                              Aún no hay otra empresa registrada para reasignar este código.
+                                            </p>
+                                          )}
+                                        </div>
+
+                                        <div>
+                                          <label className="mb-2 block text-sm text-gray-400">
+                                            Grupo destino
+                                          </label>
+
+                                          <select
+                                            value={reassignmentGroupId}
+                                            onChange={(event) =>
+                                              setReassignmentGroupId(event.target.value)
+                                            }
+                                            disabled={!reassignmentCompanyId}
+                                            className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-orange-400/60 disabled:cursor-not-allowed disabled:opacity-50"
+                                          >
+                                            <option value="">
+                                              Seleccionar grupo
+                                            </option>
+
+                                            {reassignmentGroups
+                                              .filter(
+                                                (targetGroup) =>
+                                                  targetGroup.company_id === reassignmentCompanyId
+                                              )
+                                              .map((targetGroup) => (
+                                                <option key={targetGroup.id} value={targetGroup.id}>
+                                                  {targetGroup.name}
+                                                </option>
+                                              ))}
+                                          </select>
+                                        </div>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => void reassignCode()}
+                                        disabled={savingCodeAction === code.id}
+                                        className="mt-4 rounded-xl border border-orange-400/40 px-4 py-3 text-sm font-semibold text-orange-200 transition hover:bg-orange-400/10 disabled:opacity-50"
+                                      >
+                                        {savingCodeAction === code.id
+                                          ? "Reasignando..."
+                                          : "Reasignar código"}
+                                      </button>
+                                    </div>
+                                  )}
+
                                   <div className="flex gap-2">
 
                                     <button
@@ -1283,9 +1540,8 @@ export default function CompanyPage() {
                                           true
                                         );
 
-                                        setEditingGroupId(
-                                          ""
-                                        );
+                                        setReassignmentCompanyId("");
+                                        setReassignmentGroupId("");
                                       }}
                                       className="rounded-xl border border-white/10 px-4 py-3 text-sm transition hover:border-orange-400/40 hover:bg-orange-400/10"
                                     >

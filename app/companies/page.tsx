@@ -9,11 +9,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SignOutButton } from "@/app/components/sign-out-button";
+import { CompanyAvatar } from "@/app/components/company-avatar";
+import { TapixxoMark } from "@/app/components/tapixxo-brand";
 
 type Company = {
   id: string;
   name: string;
   created_at: string;
+  profile_image_path: string | null;
 };
 
 export default function CompaniesPage() {
@@ -32,6 +35,10 @@ export default function CompaniesPage() {
   const [checkingAccess, setCheckingAccess] =
     useState(true);
   const [saving, setSaving] = useState(false);
+  const [companyToDelete, setCompanyToDelete] =
+    useState<Company | null>(null);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -71,12 +78,33 @@ export default function CompaniesPage() {
 
     const { data, error } = await supabase
       .from("companies")
-      .select("id, name, created_at")
+      .select("id, name, created_at, profile_image_path")
       .order("created_at", {
         ascending: false,
       });
 
     if (error) {
+      if (error.code === "42703") {
+        const { data: fallbackCompanies, error: fallbackError } =
+          await supabase
+            .from("companies")
+            .select("id, name, created_at")
+            .order("created_at", {
+              ascending: false,
+            });
+
+        if (!fallbackError) {
+          setCompanies(
+            (fallbackCompanies ?? []).map((company) => ({
+              ...company,
+              profile_image_path: null,
+            }))
+          );
+          setLoading(false);
+          return;
+        }
+      }
+
       setError(error.message);
     } else {
       setCompanies(data ?? []);
@@ -189,6 +217,49 @@ export default function CompaniesPage() {
     }
   }
 
+  async function deleteCompany(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (!companyToDelete || !adminPassword) {
+      setError("Introduce tu contraseña de administrador.");
+      return;
+    }
+
+    setDeleting(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(
+        `/api/admin/companies/${companyToDelete.id}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: adminPassword }),
+        }
+      );
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error ?? "No se pudo eliminar la empresa.");
+        return;
+      }
+
+      setSuccess(
+        `Empresa "${companyToDelete.name}" eliminada correctamente.`
+      );
+      setCompanyToDelete(null);
+      setAdminPassword("");
+      await loadCompanies();
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   /*
    * Mientras comprobamos si el usuario es administrador,
    * no mostramos el contenido administrativo.
@@ -207,10 +278,13 @@ export default function CompaniesPage() {
     <main className="tapixxo-shell tapixxo-grid min-h-screen text-white">
       <header className="border-b border-white/[0.08] bg-black/20 px-5 py-5 backdrop-blur-sm md:px-8">
         <div className="mx-auto flex max-w-7xl items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-orange-300">Tapixxo / Administración</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Empresas</h1>
-            <p className="mt-1 text-sm text-gray-500">Gestiona los clientes y sus accesos.</p>
+          <div className="flex items-center gap-3">
+            <TapixxoMark />
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-orange-300">Tapixxo / Administración</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight">Empresas</h1>
+              <p className="mt-1 text-sm text-gray-500">Gestiona los clientes y sus accesos.</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden items-center gap-2 text-sm text-gray-400 sm:flex">
@@ -358,28 +432,102 @@ export default function CompaniesPage() {
                   key={company.id}
                   className="flex items-center justify-between rounded-2xl border border-white/[0.08] bg-black/25 px-5 py-4 transition hover:border-orange-400/30 hover:bg-orange-400/[0.03]"
                 >
-                  <div>
-                    <p className="font-medium tracking-tight">
-                      {company.name}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <CompanyAvatar
+                      name={company.name}
+                      imagePath={company.profile_image_path}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium tracking-tight">
+                        {company.name}
+                      </p>
 
-                    <p className="text-xs text-gray-500">
-                      {company.id}
-                    </p>
+                      <p className="truncate text-xs text-gray-500">
+                        {company.id}
+                      </p>
+                    </div>
                   </div>
 
-                  <Link
-                    href={`/companies/${company.id}`}
-                    className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium transition hover:border-orange-400/40 hover:bg-orange-400/10"
-                  >
-                    Abrir
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/companies/${company.id}`}
+                      className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium transition hover:border-orange-400/40 hover:bg-orange-400/10"
+                    >
+                      Abrir
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCompanyToDelete(company);
+                        setAdminPassword("");
+                        setError("");
+                        setSuccess("");
+                      }}
+                      className="rounded-xl border border-red-400/30 px-4 py-2 text-sm font-medium text-red-300 transition hover:border-red-400/60 hover:bg-red-400/10"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </section>
       </div>
+
+      {companyToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-5 backdrop-blur-sm">
+          <form
+            onSubmit={deleteCompany}
+            className="w-full max-w-md rounded-2xl border border-red-400/30 bg-[#15120f] p-6 shadow-2xl"
+          >
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-red-300">
+              Acción irreversible
+            </p>
+            <h2 className="mt-2 text-xl font-semibold text-white">
+              Eliminar {companyToDelete.name}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-gray-400">
+              Se eliminarán la empresa, sus grupos, códigos, escaneos y cuentas de acceso. Confirma con tu contraseña de administrador.
+            </p>
+
+            <label className="mt-5 block text-sm text-gray-300">
+              Contraseña de administrador
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(event) => setAdminPassword(event.target.value)}
+                autoComplete="current-password"
+                autoFocus
+                disabled={deleting}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-red-400/60 disabled:opacity-50"
+              />
+            </label>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => {
+                  setCompanyToDelete(null);
+                  setAdminPassword("");
+                }}
+                className="rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.06] disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={deleting || !adminPassword}
+                className="rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting ? "Eliminando..." : "Eliminar definitivamente"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </main>
   );
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   try {
@@ -55,10 +55,7 @@ export async function POST(request: Request) {
 
     // Cliente administrativo.
     // Esta clave SOLO existe en el servidor.
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseAdmin = createAdminClient();
 
     // Comprobar que el usuario es administrador
     const { data: profile, error: profileError } =
@@ -67,13 +64,6 @@ export async function POST(request: Request) {
         .select("role")
         .eq("id", user.id)
         .single();
-
-    console.log("ADMIN CHECK:", {
-        userId: user.id,
-        email: user.email,
-        profile,
-        profileError,
-        });
 
     if (
       profileError ||
