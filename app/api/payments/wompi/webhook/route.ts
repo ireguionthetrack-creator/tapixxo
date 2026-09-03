@@ -174,11 +174,17 @@ export async function POST(request: Request) {
 
     const webhookResult = result as { outcome?: string } | null;
     const outcome = webhookResult?.outcome ?? "unknown";
+
     if (
       outcome === "paid" ||
       outcome === "failed" ||
       outcome === "idempotent_paid" ||
       outcome === "idempotent_failed" ||
+      outcome === "assigned" ||
+      outcome === "idempotent_assigned" ||
+      outcome === "guest_pending" ||
+      outcome === "needs_review" ||
+      outcome === "stock_not_captured" ||
       outcome === "ignored_status"
     ) {
       console.info(

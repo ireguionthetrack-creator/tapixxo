@@ -111,7 +111,7 @@ export async function POST(request: Request) {
         "amount-in-cents": amountInCents.toString(),
         reference: order.order_reference,
         "signature:integrity": integritySignature,
-        "redirect-url": `${config.appUrl}/store/payment/return`,
+        "redirect-url": `${config.appUrl}/store/payment/return?reference=${encodeURIComponent(order.order_reference)}`,
       },
     });
   } catch (error) {

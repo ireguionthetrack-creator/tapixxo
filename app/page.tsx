@@ -1,36 +1,11 @@
 import Link from "next/link";
-import { TapixxoBrand } from "@/app/components/tapixxo-brand";
+import { StoreHeader } from "@/app/components/store-header";
 
 export default function HomePage() {
   return (
     <main className="tapixxo-shell min-h-screen text-white">
 
-      {/* NAVBAR */}
-
-      <header className="border-b border-white/10">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 lg:px-8">
-
-          <Link href="/" aria-label="Tapixxo">
-            <TapixxoBrand priority />
-          </Link>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/store"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-gray-300 transition hover:bg-white/5 hover:text-white"
-            >
-              Store
-            </Link>
-            <Link
-              href="/login"
-              className="rounded-lg border border-white/15 px-3.5 py-2 text-sm font-medium text-white transition hover:border-white/30 hover:bg-white/5 sm:px-5 sm:py-2.5"
-            >
-              Iniciar sesión
-            </Link>
-          </div>
-
-        </div>
-      </header>
+      <StoreHeader />
 
 
       {/* HERO */}

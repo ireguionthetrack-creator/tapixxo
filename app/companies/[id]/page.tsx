@@ -54,6 +54,7 @@ export default function CompanyPage() {
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [codes, setCodes] = useState<Code[]>([]);
+  const [newStoreCodeIds, setNewStoreCodeIds] = useState<string[]>([]);
 
   const [scanCounts, setScanCounts] =
     useState<Record<string, number>>({});
@@ -321,6 +322,19 @@ export default function CompanyPage() {
     }
 
     setCodes(data ?? []);
+
+    try {
+      const response = await fetch(`/api/companies/${companyId}/store-code-freshness`, {
+        cache: "no-store",
+      });
+      const result = await response.json();
+      if (response.ok && Array.isArray(result.code_ids)) {
+        setNewStoreCodeIds(result.code_ids.filter((id: unknown): id is string => typeof id === "string"));
+      }
+    } catch {
+      // El tag es complementario: no bloquea el panel si su consulta falla.
+      setNewStoreCodeIds([]);
+    }
   }
 
   /*
@@ -1277,6 +1291,12 @@ export default function CompanyPage() {
                                 <span className="font-mono font-semibold">
                                   {code.code}
                                 </span>
+
+                                {newStoreCodeIds.includes(code.id) && (
+                                  <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2 py-1 text-xs font-medium text-emerald-100">
+                                    Nuevo
+                                  </span>
+                                )}
 
                                 <span
                                   className={`rounded-full px-2 py-1 text-xs ${

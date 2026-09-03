@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const TERMS_VERSION = "2026-09-03";
 
 type CheckoutBody = {
   client_request_id?: unknown;
@@ -31,6 +32,7 @@ type CheckoutBody = {
   address?: unknown;
   address_extra?: unknown;
   shipping_classification?: unknown;
+  terms_accepted?: unknown;
 };
 
 class CheckoutValidationError extends Error {}
@@ -110,6 +112,13 @@ export async function POST(request: Request) {
     const productKey = requiredText(body.product_key, "el producto", 100);
     const modelKey = requiredText(body.model_key, "el modelo", 100);
     const quantity = body.quantity;
+
+    if (body.terms_accepted !== true) {
+      return NextResponse.json(
+        { error: "Debes aceptar los Términos y Condiciones para continuar." },
+        { status: 400 }
+      );
+    }
 
     if (!UUID_PATTERN.test(clientRequestId)) {
       return NextResponse.json({ error: "La solicitud de compra no es válida." }, { status: 400 });
@@ -202,12 +211,21 @@ export async function POST(request: Request) {
       const supabaseAdmin = createAdminClient();
       const { data: profile, error: profileError } = await supabaseAdmin
         .from("profiles")
-        .select("company_id")
+        .select("company_id, role")
         .eq("id", user.id)
         .maybeSingle();
 
       if (profileError) throw new Error("No se pudo resolver la cuenta Tapixxo.");
-      companyId = profile?.company_id ?? null;
+      if (profile?.role !== "company" || !profile.company_id) {
+        return NextResponse.json(
+          {
+            error:
+              "Tu sesión no está vinculada a una empresa. Usa una cuenta de empresa para comprar y asignar placas.",
+          },
+          { status: 409 }
+        );
+      }
+      companyId = profile.company_id;
     } else {
       const requestHeaders = await headers();
       const forwardedFor = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
@@ -269,6 +287,8 @@ export async function POST(request: Request) {
         p_quantity: quantity,
         p_unit_price_cop: unitPriceCop,
         p_line_total_cop: subtotalCop,
+        p_terms_accepted: true,
+        p_terms_version: TERMS_VERSION,
       })
       .single();
 

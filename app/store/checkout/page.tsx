@@ -55,6 +55,7 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [preparedOrder, setPreparedOrder] = useState<PreparedOrder | null>(null);
   const [startingPayment, setStartingPayment] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -118,6 +119,7 @@ export default function CheckoutPage() {
       unitPriceCop !== null &&
       shippingCop !== null &&
       hasEnoughStock &&
+      termsAccepted &&
       !submitting
   );
 
@@ -142,6 +144,7 @@ export default function CheckoutPage() {
           model_key: selection.modelKey,
           quantity: selection.quantity,
           shipping_classification: shippingClassification,
+          terms_accepted: termsAccepted,
           ...form,
         }),
       });
@@ -256,6 +259,21 @@ export default function CheckoutPage() {
               <CheckoutInput label="Teléfono" type="tel" value={form.phone} onChange={(value) => updateField("phone", value)} required />
               <CheckoutInput label="Email" type="email" value={form.email} onChange={(value) => updateField("email", value)} required disabled={Boolean(accountEmail)} className="sm:col-span-2" />
             </fieldset>
+            <label className="mt-7 flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-gray-300">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(event) => setTermsAccepted(event.target.checked)}
+                className="mt-1 h-4 w-4 accent-orange-400"
+              />
+              <span>
+                He leído y acepto los{" "}
+                <Link href="/terminos" className="font-medium text-orange-200 underline hover:text-orange-100">
+                  Términos y Condiciones
+                </Link>
+                .
+              </span>
+            </label>
             <fieldset className="mt-8 grid gap-4 sm:grid-cols-2">
               <legend className="mb-1 text-sm font-medium uppercase tracking-[.16em] text-orange-300 sm:col-span-2">Entrega</legend>
               <CheckoutInput label="País" value={form.country} onChange={(value) => updateField("country", value)} required />
