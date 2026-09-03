@@ -53,6 +53,22 @@ function responseReceived() {
   return NextResponse.json({ received: true }, { status: 200 });
 }
 
+function logWebhookProcessingFailure(
+  reference: string,
+  transactionId: string,
+  wompiStatus: string,
+  outcome: string
+) {
+  console.error(
+    `Wompi webhook could not apply transaction ${JSON.stringify({
+      orderReference: reference,
+      transactionId,
+      wompiStatus,
+      outcome,
+    })}`
+  );
+}
+
 export async function POST(request: Request) {
   let payload: WompiWebhook;
 
@@ -135,10 +151,12 @@ export async function POST(request: Request) {
       !amountInCents ||
       typeof status !== "string"
     ) {
-      console.warn("Wompi webhook ignored incomplete transaction", {
-        event: payload.event,
-      });
-      return responseReceived();
+      console.error(
+        `Wompi webhook could not process incomplete transaction ${JSON.stringify({
+          event: payload.event,
+        })}`
+      );
+      return NextResponse.json({ error: "Incomplete transaction event." }, { status: 400 });
     }
 
     const supabase = createAdminClient();
@@ -156,18 +174,32 @@ export async function POST(request: Request) {
 
     const webhookResult = result as { outcome?: string } | null;
     const outcome = webhookResult?.outcome ?? "unknown";
-    const log = outcome === "paid" ? console.info : console.warn;
-    log("Wompi webhook processed", {
-      orderReference: reference,
-      transactionId,
-      wompiStatus: status,
-      outcome,
-    });
-    return responseReceived();
+    if (
+      outcome === "paid" ||
+      outcome === "failed" ||
+      outcome === "idempotent_paid" ||
+      outcome === "idempotent_failed" ||
+      outcome === "ignored_status"
+    ) {
+      console.info(
+        `Wompi webhook processed ${JSON.stringify({
+          orderReference: reference,
+          transactionId,
+          wompiStatus: status,
+          outcome,
+        })}`
+      );
+      return responseReceived();
+    }
+
+    logWebhookProcessingFailure(reference, transactionId, status, outcome);
+    return NextResponse.json({ error: "Webhook transaction was not applied." }, { status: 500 });
   } catch (error) {
-    console.error("Wompi webhook processing failed", {
-      message: error instanceof Error ? error.message : "unknown_error",
-    });
+    console.error(
+      `Wompi webhook processing failed ${JSON.stringify({
+        message: error instanceof Error ? error.message : "unknown_error",
+      })}`
+    );
     return NextResponse.json({ error: "Webhook processing failed." }, { status: 500 });
   }
 }
