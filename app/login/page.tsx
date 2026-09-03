@@ -5,6 +5,27 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { TapixxoBrand } from "@/app/components/tapixxo-brand";
 
+function checkoutReturnPath() {
+  const requested = new URLSearchParams(window.location.search).get("next");
+  if (!requested) return null;
+
+  try {
+    const target = new URL(requested, window.location.origin);
+    if (target.origin !== window.location.origin || target.pathname !== "/store/checkout") {
+      return null;
+    }
+
+    const allowedKeys = new Set(["product_key", "model_key", "quantity"]);
+    if ([...target.searchParams.keys()].some((key) => !allowedKeys.has(key))) {
+      return null;
+    }
+
+    return `${target.pathname}${target.search}`;
+  } catch {
+    return null;
+  }
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -63,6 +84,14 @@ export default function LoginPage() {
       );
 
       setLoading(false);
+      return;
+    }
+
+    const returnPath = checkoutReturnPath();
+
+    if (returnPath) {
+      router.push(returnPath);
+      router.refresh();
       return;
     }
 

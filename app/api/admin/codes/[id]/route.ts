@@ -103,9 +103,12 @@ export async function PATCH(
     const { data: code, error: updateError } =
       await authorization.supabaseAdmin
         .from("codes")
-        .update({ group_id: targetGroup.id })
+        .update({
+          company_id: targetGroup.company_id,
+          group_id: targetGroup.id,
+        })
         .eq("id", codeId)
-        .select("id, group_id")
+        .select("id, company_id, group_id")
         .maybeSingle();
 
     if (updateError) {

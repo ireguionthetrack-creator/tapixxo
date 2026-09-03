@@ -5,9 +5,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 type NewCode = {
   code: string;
-  group_id: string;
-  destination_url: string | null;
-  active: boolean;
+  group_id?: string | null;
+  destination_url?: string | null;
+  active?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -72,16 +72,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const isValidCode = codes.every(
-      (newCode) =>
+    const isValidCode = codes.every((newCode) => {
+      const groupId = newCode.group_id ?? null;
+
+      return (
         typeof newCode.code === "string" &&
         /^[A-Z]+[1-9]\d*$/.test(newCode.code) &&
-        typeof newCode.group_id === "string" &&
-        newCode.group_id.length > 0 &&
-        (newCode.destination_url === null ||
+        (groupId === null ||
+          (typeof groupId === "string" && groupId.trim().length > 0)) &&
+        (newCode.destination_url === undefined ||
+          newCode.destination_url === null ||
           typeof newCode.destination_url === "string") &&
-        newCode.active === true
-    );
+        (newCode.active === undefined || typeof newCode.active === "boolean")
+      );
+    });
 
     if (!isValidCode) {
       return NextResponse.json(
@@ -90,10 +94,34 @@ export async function POST(request: Request) {
       );
     }
 
-    const groupIds = [...new Set(codes.map((newCode) => newCode.group_id))];
+    const globalCodes = codes.filter((newCode) => !newCode.group_id);
+
+    if (
+      globalCodes.some(
+        (newCode) =>
+          newCode.active !== false ||
+          (newCode.destination_url !== undefined && newCode.destination_url !== null)
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Los códigos globales deben crearse inactivos y sin destination_url.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const groupIds = [
+      ...new Set(
+        codes
+          .map((newCode) => newCode.group_id?.trim() ?? null)
+          .filter((groupId): groupId is string => groupId !== null)
+      ),
+    ];
     const { data: groups, error: groupsError } = await supabaseAdmin
       .from("code_groups")
-      .select("id")
+      .select("id, company_id")
       .in("id", groupIds);
 
     if (groupsError) {
@@ -110,9 +138,35 @@ export async function POST(request: Request) {
       );
     }
 
+    const groupsById = new Map(
+      (groups ?? []).map((group) => [group.id, group])
+    );
+    const rows = codes.map((newCode) => {
+      const groupId = newCode.group_id?.trim() ?? null;
+
+      if (!groupId) {
+        return {
+          code: newCode.code,
+          company_id: null,
+          group_id: null,
+          destination_url: null,
+          active: false,
+        };
+      }
+
+      const group = groupsById.get(groupId)!;
+      return {
+        code: newCode.code,
+        company_id: group.company_id,
+        group_id: group.id,
+        destination_url: newCode.destination_url ?? null,
+        active: newCode.active ?? true,
+      };
+    });
+
     const { error: insertError } = await supabaseAdmin
       .from("codes")
-      .insert(codes);
+      .insert(rows);
 
     if (insertError) {
       return NextResponse.json(
@@ -121,7 +175,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    return NextResponse.json({ success: true, created: rows.length }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       {
