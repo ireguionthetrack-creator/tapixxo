@@ -14,11 +14,11 @@ export default function HomePage() {
 
         <div className="pointer-events-none absolute left-1/2 top-0 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-orange-500/10 blur-[140px]" />
 
-        <div className="relative mx-auto max-w-7xl px-6 pb-28 pt-24 lg:px-8 lg:pb-36 lg:pt-32">
+        <div className="relative mx-auto max-w-7xl px-5 pb-24 pt-20 sm:px-6 sm:pt-24 lg:px-8 lg:pb-36 lg:pt-32">
 
           <div className="max-w-4xl">
 
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-gray-400">
+            <div className="tapixxo-chip mb-8 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm text-gray-300">
 
               <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
 
@@ -26,7 +26,7 @@ export default function HomePage() {
 
             </div>
 
-            <h1 className="text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl">
+            <h1 className="tapixxo-display text-5xl font-semibold sm:text-6xl lg:text-7xl">
 
               Conecta lo físico
 
@@ -52,14 +52,14 @@ export default function HomePage() {
 
               <Link
                 href="/login"
-                className="rounded-xl bg-orange-400 px-6 py-3.5 text-center font-semibold text-black transition hover:bg-orange-300 hover:shadow-[0_0_28px_rgba(255,122,26,0.25)]"
+                className="tapixxo-button-primary rounded-2xl bg-orange-400 px-6 py-3.5 text-center font-semibold text-black transition hover:bg-orange-300"
               >
                 Acceder al panel
               </Link>
 
               <a
                 href="#como-funciona"
-                className="rounded-lg border border-white/15 px-6 py-3.5 text-center font-medium text-white transition hover:border-white/30 hover:bg-white/5"
+                className="rounded-2xl border border-white/15 bg-white/[0.045] px-6 py-3.5 text-center font-medium text-white shadow-[inset_0_1px_rgba(255,255,255,0.1)] transition hover:border-orange-300/40 hover:bg-white/[0.09]"
               >
                 Conocer Tapixxo
               </a>
@@ -105,9 +105,9 @@ export default function HomePage() {
         </div>
 
 
-        <div className="mt-16 grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 md:grid-cols-3">
+        <div className="mt-12 grid gap-4 md:mt-16 md:grid-cols-3">
 
-              <div className="bg-black/45 p-8">
+              <div className="tapixxo-glass-card tapixxo-enter p-7 sm:p-8">
 
             <span className="text-sm text-gray-600">
               01
@@ -125,7 +125,7 @@ export default function HomePage() {
           </div>
 
 
-              <div className="bg-black/45 p-8">
+              <div className="tapixxo-glass-card tapixxo-enter tapixxo-enter-delay-1 p-7 sm:p-8">
 
             <span className="text-sm text-gray-600">
               02
@@ -143,7 +143,7 @@ export default function HomePage() {
           </div>
 
 
-              <div className="bg-black/45 p-8">
+              <div className="tapixxo-glass-card tapixxo-enter tapixxo-enter-delay-2 p-7 sm:p-8">
 
             <span className="text-sm text-gray-600">
               03
@@ -167,7 +167,7 @@ export default function HomePage() {
 
       {/* PARA EMPRESAS */}
 
-      <section className="border-y border-white/10 bg-white/[0.02]">
+      <section className="border-y border-white/10 bg-white/[0.025] backdrop-blur-sm">
 
         <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
 
@@ -196,7 +196,7 @@ export default function HomePage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
 
-              <div className="rounded-2xl border border-white/10 bg-black p-6">
+              <div className="tapixxo-glass-card p-6">
 
                 <div className="mb-5 text-2xl">
                   ↗
@@ -214,7 +214,7 @@ export default function HomePage() {
               </div>
 
 
-              <div className="rounded-2xl border border-white/10 bg-black p-6">
+              <div className="tapixxo-glass-card p-6">
 
                 <div className="mb-5 text-2xl">
                   ◉
@@ -231,7 +231,7 @@ export default function HomePage() {
               </div>
 
 
-              <div className="rounded-2xl border border-white/10 bg-black p-6">
+              <div className="tapixxo-glass-card p-6">
 
                 <div className="mb-5 text-2xl">
                   #
@@ -248,7 +248,7 @@ export default function HomePage() {
               </div>
 
 
-              <div className="rounded-2xl border border-white/10 bg-black p-6">
+              <div className="tapixxo-glass-card p-6">
 
                 <div className="mb-5 text-2xl">
                   ✓
@@ -278,7 +278,7 @@ export default function HomePage() {
 
       <section className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
 
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] px-8 py-16 text-center sm:px-16">
+        <div className="tapixxo-liquid-cta relative rounded-3xl px-6 py-14 text-center sm:px-16 sm:py-16">
 
           <div className="pointer-events-none absolute left-1/2 top-0 h-64 w-64 -translate-x-1/2 rounded-full bg-orange-500/10 blur-[100px]" />
 
@@ -296,7 +296,7 @@ export default function HomePage() {
 
               <Link
                 href="/login"
-                className="mt-8 inline-flex rounded-xl bg-orange-400 px-6 py-3.5 font-semibold text-black transition hover:bg-orange-300 hover:shadow-[0_0_28px_rgba(255,122,26,0.25)]"
+                className="tapixxo-button-primary mt-8 inline-flex rounded-2xl bg-orange-400 px-6 py-3.5 font-semibold text-black transition hover:bg-orange-300"
             >
               Entrar a Tapixxo
             </Link>
@@ -310,7 +310,7 @@ export default function HomePage() {
 
       {/* FOOTER */}
 
-      <footer className="border-t border-white/10">
+      <footer className="tapixxo-nav-glass border-t border-white/10">
 
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-8 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between lg:px-8">
 

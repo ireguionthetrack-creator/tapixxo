@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SignOutButton } from "@/app/components/sign-out-button";
+import { LiquidLoader } from "@/app/components/liquid-loader";
 import { TapixxoMark } from "@/app/components/tapixxo-brand";
 import { createClient } from "@/lib/supabase/client";
 
@@ -110,7 +111,7 @@ export default function AdminStockPage() {
     review: stock.review.filter((item) => matches(item.code, search)),
   }), [search, stock]);
 
-  if (checkingAccess) return <main className="tapixxo-shell flex min-h-screen items-center justify-center text-sm text-gray-400">Verificando acceso...</main>;
+  if (checkingAccess) return <main className="tapixxo-shell flex min-h-screen items-center justify-center"><LiquidLoader /></main>;
 
   return (
     <main className="tapixxo-shell tapixxo-grid min-h-screen text-white">

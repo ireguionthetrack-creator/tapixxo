@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createPermanentQrPng } from "@/lib/qr-png";
+
+const QR_BUCKET = "code-qr-png";
 
 type NewCode = {
   code: string;
@@ -9,6 +12,20 @@ type NewCode = {
   destination_url?: string | null;
   active?: boolean;
 };
+
+function codeUrl(code: string) {
+  const appUrl = process.env.TAPIXXO_APP_URL;
+  if (!appUrl) {
+    throw new Error("Falta TAPIXXO_APP_URL para generar los QR permanentes.");
+  }
+
+  const origin = new URL(appUrl);
+  if (origin.protocol !== "https:") {
+    throw new Error("TAPIXXO_APP_URL debe usar HTTPS para generar los QR permanentes.");
+  }
+
+  return new URL(`/t/${encodeURIComponent(code)}`, origin).toString();
+}
 
 export async function POST(request: Request) {
   try {
@@ -164,15 +181,81 @@ export async function POST(request: Request) {
       };
     });
 
-    const { error: insertError } = await supabaseAdmin
+    const { data: createdCodes, error: insertError } = await supabaseAdmin
       .from("codes")
-      .insert(rows);
+      .insert(rows)
+      .select("id, code");
 
     if (insertError) {
       return NextResponse.json(
         { error: insertError.message, code: insertError.code },
         { status: 400 }
       );
+    }
+
+    if (!createdCodes || createdCodes.length !== rows.length) {
+      throw new Error("No se pudieron identificar los códigos creados.");
+    }
+
+    try {
+      const qrPaths = createdCodes.map((code) => ({
+        id: code.id,
+        path: `${code.id}.png`,
+        png: createPermanentQrPng(codeUrl(code.code)),
+      }));
+
+      for (let index = 0; index < qrPaths.length; index += 5) {
+        await Promise.all(
+          qrPaths.slice(index, index + 5).map(async (qr) => {
+            const { error: uploadError } = await supabaseAdmin.storage
+              .from(QR_BUCKET)
+              .upload(qr.path, qr.png, {
+                contentType: "image/png",
+                cacheControl: "31536000, immutable",
+                upsert: false,
+              });
+
+            if (uploadError) {
+              throw new Error(`No se pudo guardar el QR permanente: ${uploadError.message}`);
+            }
+          }),
+        );
+      }
+
+      await Promise.all(
+        qrPaths.map(async (qr) => {
+          const { data: linkedCode, error: pathError } = await supabaseAdmin
+            .from("codes")
+            .update({ qr_png_path: qr.path })
+            .eq("id", qr.id)
+            .is("qr_png_path", null)
+            .select("id")
+            .maybeSingle();
+
+          if (pathError || !linkedCode) {
+            throw new Error(
+              `No se pudo vincular el QR permanente: ${pathError?.message ?? "el código ya no está disponible"}`,
+            );
+          }
+        }),
+      );
+    } catch (qrError) {
+      const { error: rollbackError } = await supabaseAdmin
+        .from("codes")
+        .delete()
+        .in(
+          "id",
+          createdCodes.map((code) => code.id),
+        );
+
+      if (rollbackError) {
+        console.error("Code creation QR rollback failed", {
+          code: rollbackError.code,
+          message: rollbackError.message,
+        });
+      }
+
+      throw qrError;
     }
 
     return NextResponse.json({ success: true, created: rows.length }, { status: 201 });

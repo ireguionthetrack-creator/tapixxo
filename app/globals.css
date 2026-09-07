@@ -1,13 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #080909;
-  --foreground: #f4f4f0;
-  --muted: #93958d;
-  --line: rgba(255, 255, 255, 0.09);
-  --panel: rgba(17, 18, 17, 0.82);
+  --background: #070808;
+  --foreground: #f8f8f4;
+  --muted: #a1a299;
+  --line: rgba(255, 255, 255, 0.11);
+  --glass: rgba(24, 25, 24, 0.54);
+  --glass-deep: rgba(20, 21, 20, 0.58);
   --orange: #ff7a1a;
-  --orange-bright: #ff9a4d;
+  --orange-bright: #ffad72;
+  --orange-soft: rgba(255, 122, 26, 0.16);
 }
 
 @theme inline {
@@ -17,70 +19,445 @@
   --font-mono: var(--font-geist-mono);
 }
 
-body {
+html {
   background: var(--background);
+  scroll-behavior: smooth;
+  scroll-padding-top: 6.5rem;
+}
+
+body {
+  min-width: 320px;
+  overflow-x: hidden;
+  background:
+    radial-gradient(60rem 42rem at 100% -15%, rgba(255, 122, 26, 0.12), transparent 54%),
+    radial-gradient(46rem 30rem at -10% 108%, rgba(255, 122, 26, 0.08), transparent 58%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-* {
-  border-color: var(--line);
-}
+* { border-color: var(--line); }
 
 ::selection {
   background: var(--orange);
   color: #170b02;
 }
 
+::placeholder { color: rgba(223, 223, 216, 0.38); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0a0b0b; }
+::-webkit-scrollbar-thumb {
+  border: 3px solid #0a0b0b;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 154, 77, 0.65); }
+
 .tapixxo-shell {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
+  overflow: clip;
   background:
-    radial-gradient(circle at 84% -12%, rgba(255, 122, 26, 0.14), transparent 27rem),
-    radial-gradient(circle at 0% 100%, rgba(255, 122, 26, 0.06), transparent 24rem),
-    #080909;
+    radial-gradient(44rem 34rem at 50% -12%, rgba(255, 122, 26, 0.13), transparent 58%),
+    radial-gradient(36rem 32rem at 50% 112%, rgba(255, 122, 26, 0.07), transparent 65%),
+    linear-gradient(135deg, #0a0b0b 0%, #070808 46%, #0c0a08 100%);
+}
+
+.tapixxo-shell::before,
+.tapixxo-shell::after {
+  position: fixed;
+  z-index: -1;
+  width: min(44vw, 36rem);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  content: "";
+  pointer-events: none;
+  filter: blur(18px);
+  opacity: 0.48;
+}
+
+.tapixxo-shell::before {
+  top: 5%;
+  left: 50%;
+  translate: -50% 0;
+  background: radial-gradient(circle, rgba(255, 122, 26, 0.19), transparent 67%);
+  animation: tapixxo-drift 15s ease-in-out infinite alternate;
+}
+
+.tapixxo-shell::after {
+  bottom: -25%;
+  left: 50%;
+  translate: -50% 0;
+  background: radial-gradient(circle, rgba(255, 178, 113, 0.09), transparent 68%);
+  animation: tapixxo-drift 19s ease-in-out -7s infinite alternate-reverse;
 }
 
 .tapixxo-grid {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 44px 44px;
+    linear-gradient(rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px);
+  background-size: 52px 52px;
+}
+
+.tapixxo-panel,
+.tapixxo-glass,
+.tapixxo-glass-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background:
+    radial-gradient(circle at 50% -18%, rgba(255, 122, 26, 0.12), transparent 51%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04) 30%, rgba(255, 122, 26, 0.045) 100%),
+    var(--glass-deep);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.025),
+    0 20px 60px rgba(0, 0, 0, 0.26),
+    0 2px 9px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(22px) saturate(142%);
+  -webkit-backdrop-filter: blur(22px) saturate(142%);
+}
+
+.tapixxo-panel::before,
+.tapixxo-glass::before,
+.tapixxo-glass-card::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 28%, transparent 72%, rgba(255, 154, 77, 0.08));
+  background-size: 100% 180%;
+  background-position: 50% 0%;
+  content: "";
+  pointer-events: none;
+}
+
+.tapixxo-glass-card {
+  border-radius: 1.5rem;
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), border-color 320ms ease, box-shadow 320ms ease;
+}
+
+.tapixxo-panel:hover,
+.tapixxo-glass-card:hover {
+  border-color: rgba(255, 154, 77, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 25px 72px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(255, 122, 26, 0.05);
+}
+
+@media (hover: hover) {
+  .tapixxo-panel:hover { transform: translateY(-2px); }
+  .tapixxo-glass-card:hover { transform: translateY(-5px) scale(1.006); }
 }
 
 .tapixxo-panel {
-  border: 1px solid var(--line);
-  background: linear-gradient(145deg, rgba(27, 28, 27, 0.88), rgba(13, 14, 13, 0.94));
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025), 0 16px 40px rgba(0, 0, 0, 0.16);
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), border-color 320ms ease, box-shadow 320ms ease;
 }
 
-.tapixxo-panel:hover {
-  border-color: rgba(255, 122, 26, 0.28);
+/* Las listas internas del panel también reciben profundidad de cristal. */
+.tapixxo-shell .bg-black\/15,
+.tapixxo-shell .bg-black\/25,
+.tapixxo-shell .bg-black\/30,
+.tapixxo-shell .bg-black\/35,
+.tapixxo-shell .bg-black\/40,
+.tapixxo-shell .bg-black\/45 {
+  background-color: rgba(36, 37, 35, 0.42) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(14px) saturate(125%);
 }
 
-.tapixxo-enter {
-  animation: tapixxo-enter 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+.tapixxo-shell button,
+.tapixxo-shell a[class*="rounded"] {
+  transition:
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    background-color 220ms ease,
+    color 220ms ease !important;
 }
 
+@media (hover: hover) {
+  .tapixxo-shell button:not([disabled]):hover,
+  .tapixxo-shell a[class*="rounded"]:hover {
+    transform: translateY(-2px);
+  }
+
+  .tapixxo-shell button:not([disabled]):active,
+  .tapixxo-shell a[class*="rounded"]:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
+
+.tapixxo-shell button.bg-orange-400,
+.tapixxo-shell a.bg-orange-400 {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -1px 0 rgba(111, 45, 0, 0.16),
+    0 10px 24px rgba(255, 122, 26, 0.25);
+}
+
+.tapixxo-shell button.bg-orange-400:hover,
+.tapixxo-shell a.bg-orange-400:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.52),
+    0 15px 34px rgba(255, 122, 26, 0.4),
+    0 0 0 1px rgba(255, 198, 158, 0.28);
+}
+
+.tapixxo-nav-glass,
+.tapixxo-shell > header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: linear-gradient(180deg, rgba(20, 21, 20, 0.72), rgba(11, 12, 12, 0.47)) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 13px 42px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(20px) saturate(145%);
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+}
+
+.tapixxo-chip {
+  border: 1px solid rgba(255, 188, 141, 0.26);
+  background: linear-gradient(135deg, rgba(255, 149, 75, 0.16), rgba(255, 255, 255, 0.045));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.13), 0 8px 28px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(14px);
+}
+
+.tapixxo-display {
+  letter-spacing: -0.068em;
+  text-wrap: balance;
+  text-shadow: 0 2px 26px rgba(0, 0, 0, 0.26);
+}
+
+.tapixxo-liquid-cta {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 184, 132, 0.29);
+  background:
+    radial-gradient(circle at 50% -15%, rgba(255, 122, 26, 0.22), transparent 48%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.025)),
+    rgba(18, 18, 17, 0.72);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.16), 0 28px 70px rgba(0, 0, 0, 0.27);
+  backdrop-filter: blur(24px) saturate(145%);
+}
+
+.tapixxo-button-primary {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(255, 122, 26, 0.2), inset 0 1px rgba(255, 255, 255, 0.37);
+}
+
+.tapixxo-button-primary::before {
+  position: absolute;
+  top: -140%;
+  left: -35%;
+  z-index: -1;
+  width: 46%;
+  height: 310%;
+  transform: rotate(24deg);
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.5), transparent);
+  content: "";
+  transition: transform 650ms ease;
+}
+
+@media (hover: hover) {
+  .tapixxo-button-primary:hover::before { transform: translateX(370%) rotate(24deg); }
+}
+
+input:not([type="checkbox"]),
+textarea,
+select {
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.07), 0 6px 18px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px);
+}
+
+input:not([type="checkbox"]):focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px rgba(255, 122, 26, 0.13), inset 0 1px rgba(255, 255, 255, 0.09);
+}
+
+.tapixxo-enter { animation: tapixxo-enter 680ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 .tapixxo-enter-delay-1 { animation-delay: 90ms; }
 .tapixxo-enter-delay-2 { animation-delay: 180ms; }
 .tapixxo-enter-delay-3 { animation-delay: 270ms; }
+.tapixxo-pulse { animation: tapixxo-pulse 2.4s ease-in-out infinite; }
 
-.tapixxo-pulse {
-  animation: tapixxo-pulse 2.4s ease-in-out infinite;
+.tapixxo-liquid-loader {
+  position: relative;
+  isolation: isolate;
+  width: 4.5rem;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 209, 175, 0.34);
+  border-radius: 38% 62% 57% 43% / 43% 45% 55% 57%;
+  background:
+    radial-gradient(circle at 33% 27%, rgba(255, 255, 255, 0.78), transparent 11%),
+    radial-gradient(circle at 60% 66%, rgba(255, 122, 26, 0.88), rgba(255, 122, 26, 0.17) 42%, transparent 66%),
+    rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.42),
+    inset 0 -8px 18px rgba(90, 31, 0, 0.16),
+    0 0 36px rgba(255, 122, 26, 0.26);
+  backdrop-filter: blur(16px) saturate(155%);
+  animation: tapixxo-liquid-loader 1.8s ease-in-out infinite;
+}
+
+.tapixxo-liquid-loader::before,
+.tapixxo-liquid-loader::after,
+.tapixxo-liquid-loader span {
+  position: absolute;
+  border: 1px solid rgba(255, 222, 197, 0.26);
+  border-radius: inherit;
+  content: "";
+}
+
+.tapixxo-liquid-loader::before {
+  inset: -0.42rem;
+  z-index: 1;
+  opacity: 0.58;
+  animation: tapixxo-liquid-orbit 1.8s ease-in-out infinite reverse;
+}
+
+.tapixxo-liquid-loader::after {
+  inset: 1.15rem;
+  z-index: 3;
+  background: rgba(255, 238, 225, 0.36);
+  box-shadow: 0 0 15px rgba(255, 122, 26, 0.52);
+  animation: tapixxo-liquid-core 1.2s ease-in-out infinite;
+}
+
+.tapixxo-liquid-loader span {
+  inset: 0.42rem;
+  z-index: 2;
+  border-color: rgba(255, 255, 255, 0.24);
+  animation: tapixxo-liquid-orbit 1.45s linear infinite;
+}
+
+.tapixxo-loader-decagon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 0;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 203, 158, 0.23);
+  clip-path: polygon(50% 0%, 79% 9%, 98% 35%, 98% 65%, 79% 91%, 50% 100%, 21% 91%, 2% 65%, 2% 35%, 21% 9%);
+  pointer-events: none;
+}
+
+.tapixxo-loader-decagon-one {
+  width: calc(100% + 1.15rem);
+  border-color: rgba(255, 154, 77, 0.72);
+  box-shadow: 0 0 15px rgba(255, 122, 26, 0.12);
+  animation: tapixxo-decagon-one 3.8s linear infinite;
+}
+
+.tapixxo-loader-decagon-two {
+  width: calc(100% + 2.35rem);
+  animation: tapixxo-decagon-two 5.2s linear -0.8s infinite;
+}
+
+.tapixxo-loader-decagon-three {
+  width: calc(100% + 3.65rem);
+  border-color: rgba(255, 255, 255, 0.14);
+  animation: tapixxo-decagon-three 6.4s linear -1.2s infinite;
 }
 
 @keyframes tapixxo-enter {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(18px) scale(0.985); filter: blur(5px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
 @keyframes tapixxo-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 122, 26, 0.35); }
-  50% { box-shadow: 0 0 0 7px rgba(255, 122, 26, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 122, 26, 0.38), 0 0 14px rgba(255, 122, 26, 0.2); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 122, 26, 0), 0 0 20px rgba(255, 122, 26, 0.28); }
 }
 
-@keyframes draw-chart {
-  to { stroke-dashoffset: 0; }
+@keyframes tapixxo-liquid-loader {
+  0%, 100% { transform: rotate(0deg) scale(0.94); border-radius: 38% 62% 57% 43% / 43% 45% 55% 57%; }
+  50% { transform: rotate(14deg) scale(1.06); border-radius: 57% 43% 38% 62% / 60% 52% 48% 40%; }
+}
+
+@keyframes tapixxo-liquid-orbit {
+  from { transform: rotate(0deg) scale(0.94); }
+  50% { transform: rotate(180deg) scale(1.08); }
+  to { transform: rotate(360deg) scale(0.94); }
+}
+
+@keyframes tapixxo-liquid-core {
+  0%, 100% { transform: scale(0.72); opacity: 0.52; }
+  50% { transform: scale(1.12); opacity: 0.96; }
+}
+
+@keyframes tapixxo-decagon-one {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.98); opacity: 0.74; }
+  50% { opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(360deg) scale(0.98); opacity: 0.74; }
+}
+
+@keyframes tapixxo-decagon-two {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 0.4; }
+  50% { opacity: 0.76; }
+  100% { transform: translate(-50%, -50%) rotate(-360deg) scale(1); opacity: 0.4; }
+}
+
+@keyframes tapixxo-decagon-three {
+  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.02); opacity: 0.18; }
+  50% { opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.02); opacity: 0.18; }
+}
+
+@keyframes tapixxo-drift {
+  from { transform: translate3d(-3%, -2%, 0) scale(0.96); }
+  to { transform: translate3d(6%, 5%, 0) scale(1.08); }
+}
+
+/* En navegadores compatibles, los reflejos se desplazan con el scroll sin
+   afectar la opacidad ni la legibilidad del contenido. */
+@supports (animation-timeline: scroll()) {
+  .tapixxo-shell::before {
+    animation: tapixxo-scroll-glow-a 1s linear both;
+    animation-timeline: scroll(root);
+  }
+
+  .tapixxo-shell::after {
+    animation: tapixxo-scroll-glow-b 1s linear both;
+    animation-timeline: scroll(root);
+  }
+
+  .tapixxo-panel::before,
+  .tapixxo-glass-card::before {
+    animation: tapixxo-glass-refraction 1s linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 65%;
+  }
+}
+
+@keyframes tapixxo-scroll-glow-a {
+  from { transform: translate3d(-6%, -4%, 0) scale(0.92); opacity: 0.34; }
+  50% { opacity: 0.62; }
+  to { transform: translate3d(10%, 18%, 0) scale(1.18); opacity: 0.36; }
+}
+
+@keyframes tapixxo-scroll-glow-b {
+  from { transform: translate3d(7%, 8%, 0) scale(1.1); opacity: 0.28; }
+  50% { opacity: 0.5; }
+  to { transform: translate3d(-12%, -16%, 0) scale(0.9); opacity: 0.3; }
+}
+
+@keyframes tapixxo-glass-refraction {
+  from { opacity: 0.4; background-position: 50% 0%; }
+  45% { opacity: 0.84; }
+  to { opacity: 0.46; background-position: 50% 100%; }
+}
+
+@media (max-width: 640px) {
+  .tapixxo-grid { background-size: 36px 36px; }
+  .tapixxo-shell::before,
+  .tapixxo-shell::after { width: 21rem; opacity: 0.38; }
+  .tapixxo-panel,
+  .tapixxo-glass-card { border-radius: 1.25rem; }
+  .tapixxo-display { letter-spacing: -0.055em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -88,5 +465,6 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

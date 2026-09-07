@@ -6,12 +6,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { SignOutButton } from "@/app/components/sign-out-button";
 import { CompanyAvatar } from "@/app/components/company-avatar";
 import { CompanyAvatarUpload } from "@/app/components/company-avatar-upload";
+import { LiquidLoader } from "@/app/components/liquid-loader";
 
 type Company = {
   id: string;
@@ -40,11 +41,13 @@ type Code = {
   destination_url: string | null;
   active: boolean;
   created_at: string;
+  qr_png_path: string | null;
 };
 
 export default function CompanyPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const companyId = String(params.id ?? "");
@@ -110,6 +113,8 @@ export default function CompanyPage() {
   const [editingCodeId, setEditingCodeId] =
     useState<string | null>(null);
 
+  const handledEditCodeIdRef = useRef<string | null>(null);
+
   const [editingDestination, setEditingDestination] =
     useState("");
 
@@ -133,6 +138,12 @@ export default function CompanyPage() {
 
   const [savingCodeAction, setSavingCodeAction] =
     useState<string | null>(null);
+
+  const [editModeEnabled, setEditModeEnabled] = useState(false);
+  const [updatingEditMode, setUpdatingEditMode] = useState(false);
+
+  const [codeToDelete, setCodeToDelete] = useState<Code | null>(null);
+  const [deleteCodePassword, setDeleteCodePassword] = useState("");
 
   /*
    * ----------------------------------------------------
@@ -309,7 +320,7 @@ export default function CompanyPage() {
     const { data, error } = await supabase
       .from("codes")
       .select(
-        "id, code, group_id, destination_url, active, created_at"
+        "id, code, group_id, destination_url, active, created_at, qr_png_path"
       )
       .in("group_id", groupIds)
       .order("created_at", {
@@ -360,6 +371,45 @@ export default function CompanyPage() {
 
     setScanCounts(result.counts ?? {});
     setScanCountsAvailable(true);
+  }
+
+  async function loadEditMode() {
+    try {
+      const response = await fetch(
+        `/api/code-edit-mode?companyId=${encodeURIComponent(companyId)}`,
+        { cache: "no-store" }
+      );
+      const result = await response.json();
+      setEditModeEnabled(response.ok && result.enabled === true);
+    } catch {
+      setEditModeEnabled(false);
+    }
+  }
+
+  async function toggleEditMode() {
+    const nextEnabled = !editModeEnabled;
+    setUpdatingEditMode(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/code-edit-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId, enabled: nextEnabled }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error ?? "No se pudo cambiar el modo edición.");
+        return;
+      }
+
+      setEditModeEnabled(result.enabled === true);
+    } catch {
+      setError("No se pudo cambiar el modo edición.");
+    } finally {
+      setUpdatingEditMode(false);
+    }
   }
 
   async function loadReassignmentOptions() {
@@ -427,6 +477,7 @@ export default function CompanyPage() {
       loadGroups(),
       loadCodes(),
       loadScanCounts(),
+      loadEditMode(),
     ];
 
     if (accessRole === "admin") {
@@ -449,6 +500,37 @@ export default function CompanyPage() {
     // The company ID is the query identity; helpers intentionally use current state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
+
+  const requestedEditCodeId = searchParams.get("editCode");
+
+  useEffect(() => {
+    if (!requestedEditCodeId) {
+      handledEditCodeIdRef.current = null;
+      return;
+    }
+
+    if (handledEditCodeIdRef.current === requestedEditCodeId) return;
+
+    const requestedCode = codes.find((code) => code.id === requestedEditCodeId);
+    if (!requestedCode) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      if (handledEditCodeIdRef.current === requestedEditCodeId) return;
+
+      handledEditCodeIdRef.current = requestedEditCodeId;
+      setEditingCodeId(requestedCode.id);
+      setEditingDestination(requestedCode.destination_url ?? "");
+      setEditingActive(requestedCode.active);
+      setReassignmentCompanyId("");
+      setReassignmentGroupId("");
+      document.getElementById(`code-${requestedCode.id}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [codes, requestedEditCodeId]);
 
   useEffect(() => {
     if (!avatarMenuOpen) return;
@@ -710,17 +792,26 @@ export default function CompanyPage() {
     }
   }
 
-  async function deleteCode(code: Code) {
+  function requestCodeDeletion(code: Code) {
     if (role !== "admin") {
       setError("No tienes permisos para eliminar códigos.");
       return;
     }
 
-    const confirmed = window.confirm(
-      `¿Eliminar el código ${code.code}? También se eliminarán sus escaneos y esta acción no se puede deshacer.`
-    );
+    setCodeToDelete(code);
+    setDeleteCodePassword("");
+    setError("");
+  }
 
-    if (!confirmed) return;
+  async function deleteCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!codeToDelete || !deleteCodePassword) {
+      setError("Introduce tu contraseña de administrador.");
+      return;
+    }
+
+    const code = codeToDelete;
 
     setSavingCodeAction(code.id);
     setError("");
@@ -728,6 +819,8 @@ export default function CompanyPage() {
     try {
       const response = await fetch(`/api/admin/codes/${code.id}`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: deleteCodePassword }),
       });
       const result = await response.json();
 
@@ -739,6 +832,9 @@ export default function CompanyPage() {
       if (editingCodeId === code.id) {
         setEditingCodeId(null);
       }
+
+      setCodeToDelete(null);
+      setDeleteCodePassword("");
 
       await Promise.all([loadCodes(), loadScanCounts()]);
     } catch {
@@ -757,9 +853,7 @@ export default function CompanyPage() {
   if (loading) {
     return (
       <main className="tapixxo-shell flex min-h-screen items-center justify-center text-white">
-        <p className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-gray-400">
-          Verificando acceso...
-        </p>
+        <LiquidLoader />
       </main>
     );
   }
@@ -845,6 +939,24 @@ export default function CompanyPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void toggleEditMode()}
+              disabled={updatingEditMode}
+              aria-pressed={editModeEnabled}
+              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                editModeEnabled
+                  ? "border-orange-300/60 bg-orange-400 text-black hover:bg-orange-300"
+                  : "border-white/15 bg-white/[0.04] text-gray-200 hover:border-orange-400/45 hover:bg-orange-400/10"
+              }`}
+            >
+              <span aria-hidden="true">⚙</span>
+              {updatingEditMode
+                ? "Actualizando..."
+                : editModeEnabled
+                  ? "Modo edición activo"
+                  : "Activar modo edición"}
+            </button>
             <Link
               href={`/companies/${companyId}/stats`}
               className="inline-flex w-fit items-center rounded-xl bg-orange-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-orange-300 hover:shadow-[0_0_24px_rgba(255,122,26,0.28)]"
@@ -1240,7 +1352,7 @@ export default function CompanyPage() {
                     className="rounded-2xl border border-white/[0.08] bg-black/25 p-5 transition hover:border-orange-400/25"
                   >
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
 
                       <div>
 
@@ -1256,16 +1368,30 @@ export default function CompanyPage() {
 
                       </div>
 
-                      <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs text-gray-400">
-                        {
-                          codes.filter(
-                            (code) =>
-                              code.group_id ===
-                              group.id
-                          ).length
-                        }{" "}
-                        códigos
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs text-gray-400">
+                          {
+                            codes.filter(
+                              (code) =>
+                                code.group_id ===
+                                group.id
+                            ).length
+                          }{" "}
+                          códigos
+                        </span>
+
+                        {role === "admin" && (
+                          <a
+                            href={`/api/admin/code-groups/${group.id}/qr-package`}
+                            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-orange-300/30 bg-orange-400/10 px-3 py-2 text-xs font-semibold text-orange-100 transition hover:border-orange-300/60 hover:bg-orange-400/20"
+                            title={`Descargar todos los QR de ${group.name}`}
+                          >
+                            <span aria-hidden="true" className="text-base leading-none">⇩</span>
+                            <span className="hidden sm:inline">Descargar QR</span>
+                            <span className="sr-only">Descargar paquete QR de {group.name}</span>
+                          </a>
+                        )}
+                      </div>
 
                     </div>
 
@@ -1280,6 +1406,7 @@ export default function CompanyPage() {
                         .map((code) => (
 
                           <div
+                            id={`code-${code.id}`}
                             key={code.id}
                             className="flex flex-col gap-3 rounded-xl border border-white/[0.07] bg-black/35 p-4 transition hover:border-orange-400/20 md:flex-row md:items-center md:justify-between"
                           >
@@ -1338,7 +1465,11 @@ export default function CompanyPage() {
 
                             {/* EDITOR */}
 
-                            <div className="flex gap-2">
+                            <div
+                              className={`grid w-full gap-2 ${
+                                role === "admin" ? "grid-cols-2" : "grid-cols-3"
+                              } md:flex md:w-auto md:flex-wrap md:justify-end`}
+                            >
 
                               <button
                                 type="button"
@@ -1359,7 +1490,7 @@ export default function CompanyPage() {
                                     code.active
                                   );
                                 }}
-                                className="rounded-lg border border-white/10 px-3 py-2 text-sm transition hover:border-orange-400/40 hover:bg-orange-400/10"
+                                className="flex min-h-12 min-w-0 items-center justify-center rounded-xl border border-white/10 px-2 py-2 text-center text-sm transition hover:border-orange-400/40 hover:bg-orange-400/10"
                               >
                                 Editar
                               </button>
@@ -1371,17 +1502,27 @@ export default function CompanyPage() {
                                     `${window.location.origin}/t/${code.code}`
                                   )
                                 }
-                                className="rounded-lg border border-white/10 px-3 py-2 text-sm transition hover:border-orange-400/40 hover:bg-orange-400/10"
+                                className="flex min-h-12 min-w-0 items-center justify-center rounded-xl border border-white/10 px-2 py-2 text-center text-sm transition hover:border-orange-400/40 hover:bg-orange-400/10"
                               >
                                 Copiar URL
                               </button>
 
+                              {code.qr_png_path && (
+                                <a
+                                  href={`/api/admin/codes/${code.id}/qr`}
+                                  download={`${code.code}.png`}
+                                  className="flex min-h-12 min-w-0 items-center justify-center rounded-xl border border-white/10 px-2 py-2 text-center text-sm transition hover:border-orange-400/40 hover:bg-orange-400/10"
+                                >
+                                  Descargar QR
+                                </a>
+                              )}
+
                               {role === "admin" && (
                                 <button
                                   type="button"
-                                  onClick={() => void deleteCode(code)}
+                                  onClick={() => requestCodeDeletion(code)}
                                   disabled={savingCodeAction === code.id}
-                                  className="rounded-lg border border-red-400/30 px-3 py-2 text-sm text-red-300 transition hover:border-red-400/60 hover:bg-red-400/10 disabled:opacity-50"
+                                  className="flex min-h-12 min-w-0 items-center justify-center rounded-xl border border-red-400/30 px-2 py-2 text-center text-sm text-red-300 transition hover:border-red-400/60 hover:bg-red-400/10 disabled:opacity-50"
                                 >
                                   {savingCodeAction === code.id
                                     ? "Eliminando..."
@@ -1607,6 +1748,55 @@ export default function CompanyPage() {
         </section>
 
       </div>
+
+      {codeToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-5 backdrop-blur-sm">
+          <form
+            onSubmit={deleteCode}
+            className="w-full max-w-md rounded-2xl border border-red-400/30 bg-[#15120f] p-6 shadow-2xl"
+          >
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-red-300">Acción irreversible</p>
+            <h2 className="mt-2 text-xl font-semibold text-white">Eliminar {codeToDelete.code}</h2>
+            <p className="mt-3 text-sm leading-6 text-gray-400">
+              Esta acción elimina el código y sus escaneos asociados. Confirma con tu contraseña de administrador.
+            </p>
+
+            <label className="mt-5 block text-sm text-gray-300">
+              Contraseña de administrador
+              <input
+                type="password"
+                value={deleteCodePassword}
+                onChange={(event) => setDeleteCodePassword(event.target.value)}
+                autoComplete="current-password"
+                autoFocus
+                disabled={savingCodeAction === codeToDelete.id}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-red-400/60 disabled:opacity-50"
+              />
+            </label>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={savingCodeAction === codeToDelete.id}
+                onClick={() => {
+                  setCodeToDelete(null);
+                  setDeleteCodePassword("");
+                }}
+                className="rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.06] disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={savingCodeAction === codeToDelete.id || !deleteCodePassword}
+                className="rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingCodeAction === codeToDelete.id ? "Eliminando..." : "Eliminar definitivamente"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
     </main>
   );

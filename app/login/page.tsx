@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { TapixxoBrand } from "@/app/components/tapixxo-brand";
+import { LiquidLoader } from "@/app/components/liquid-loader";
 
 function checkoutReturnPath() {
   const requested = new URLSearchParams(window.location.search).get("next");
@@ -31,9 +32,54 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   const router = useRouter();
   const supabase = createClient();
+
+  function redirectForProfile(profile: { role: string; company_id: string | null }) {
+    if (profile.role === "admin") {
+      router.replace("/dashboard");
+      router.refresh();
+      return true;
+    }
+
+    if (profile.role === "company" && profile.company_id) {
+      router.replace(`/companies/${profile.company_id}`);
+      router.refresh();
+      return true;
+    }
+
+    return false;
+  }
+
+  useEffect(() => {
+    async function redirectExistingSession() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setCheckingSession(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, company_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profile && redirectForProfile(profile)) return;
+
+      await supabase.auth.signOut();
+      setCheckingSession(false);
+    }
+
+    void redirectExistingSession();
+    // The login redirect is intentionally evaluated only when this page mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleLogin(
     event: FormEvent<HTMLFormElement>
@@ -95,22 +141,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (profile.role === "admin") {
-      router.push("/dashboard");
-      router.refresh();
-      return;
-    }
-
-    if (
-      profile.role === "company" &&
-      profile.company_id
-    ) {
-      router.push(
-        `/companies/${profile.company_id}`
-      );
-      router.refresh();
-      return;
-    }
+    if (redirectForProfile(profile)) return;
 
     await supabase.auth.signOut();
 
@@ -119,6 +150,14 @@ export default function LoginPage() {
     );
 
     setLoading(false);
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="tapixxo-shell flex min-h-screen items-center justify-center">
+        <LiquidLoader />
+      </main>
+    );
   }
 
   return (

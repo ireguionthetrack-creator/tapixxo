@@ -3,6 +3,12 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies, headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isOrderCreationRateLimited } from "@/lib/store/order-rate-limit";
+import {
+  GUEST_CLAIM_COOKIE,
+  createGuestClaimToken,
+  guestClaimCookieOptions,
+  hashGuestClaimToken,
+} from "@/lib/store/guest-claim";
 import { tapixxoNfcProduct } from "@/lib/store/catalog";
 import {
   isShippingClassification,
@@ -260,6 +266,11 @@ export async function POST(request: Request) {
     const unitPriceCop = tapixxoNfcProduct.basePriceCop;
     const subtotalCop = unitPriceCop * quantity;
     const totalCop = subtotalCop + shippingCop;
+    const guestClaimToken = userId ? null : createGuestClaimToken();
+    const guestClaimTokenHash = guestClaimToken ? hashGuestClaimToken(guestClaimToken) : null;
+    if (guestClaimToken && !guestClaimTokenHash) {
+      throw new Error("No se pudo proteger el claim del pedido.");
+    }
     const supabaseAdmin = createAdminClient();
     const { data: order, error: orderError } = await supabaseAdmin
       .rpc("create_pending_store_order", {
@@ -289,6 +300,7 @@ export async function POST(request: Request) {
         p_line_total_cop: subtotalCop,
         p_terms_accepted: true,
         p_terms_version: TERMS_VERSION,
+        p_guest_claim_token_hash: guestClaimTokenHash,
       })
       .single();
 
@@ -296,7 +308,9 @@ export async function POST(request: Request) {
       throw new Error(orderError?.message ?? "No se pudo preparar el pedido.");
     }
 
-    return NextResponse.json({ order }, { status: 201 });
+    const response = NextResponse.json({ order }, { status: 201 });
+    if (guestClaimToken) response.cookies.set(GUEST_CLAIM_COOKIE, guestClaimToken, guestClaimCookieOptions());
+    return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo preparar el pedido.";
     return NextResponse.json(

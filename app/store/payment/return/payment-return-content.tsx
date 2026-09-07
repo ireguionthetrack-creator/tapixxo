@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { StoreHeader } from "@/app/components/store-header";
+import { GuestAccountForm } from "./guest-account-form";
 
 export function PaymentReturnContent() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export function PaymentReturnContent() {
   const reference = searchParams.get("reference");
   const [state, setState] = useState<"loading" | "processing" | "assigned" | "guest" | "needs_review" | "error">("loading");
   const [message, setMessage] = useState("Estamos verificando tu pago.");
+  const [guestOrder, setGuestOrder] = useState<{ email: string; businessName: string | null } | null>(null);
 
   const loadStatus = useCallback(async () => {
     if (!reference || !/^TPX-\d{6}$/.test(reference)) {
@@ -36,7 +38,8 @@ export function PaymentReturnContent() {
 
     if (result.audience === "guest" && result.payment_status === "paid" && result.stock_capture_status === "captured") {
       setState("guest");
-      setMessage("Pago aprobado. Tu placa está reservada para este pedido y ya no está disponible en la tienda.");
+      setMessage("¡Pago aprobado! Tu Tapixxo ya está separado. Crea tu cuenta para acceder a tu panel.");
+      setGuestOrder(typeof result.email === "string" ? { email: result.email, businessName: typeof result.business_name === "string" ? result.business_name : null } : null);
       return true;
     }
 
@@ -77,7 +80,7 @@ export function PaymentReturnContent() {
           <p className="mt-4 leading-7 text-gray-400">
             {message} Esta pantalla solo consulta el estado confirmado por el webhook de Wompi; nunca modifica el pago.
           </p>
-          {state === "guest" && reference && <Link href={`/store/account/create?reference=${encodeURIComponent(reference)}`} className="mt-7 inline-flex rounded-xl bg-orange-400 px-5 py-3 font-semibold text-black hover:bg-orange-300">Crear mi cuenta</Link>}
+          {state === "guest" && reference && guestOrder && <GuestAccountForm reference={reference} email={guestOrder.email} initialCompanyName={guestOrder.businessName} />}
           {state === "assigned" && <Link href="/dashboard" className="mt-7 inline-flex rounded-xl bg-orange-400 px-5 py-3 font-semibold text-black hover:bg-orange-300">Ir a mi panel</Link>}
           <Link href="/store" className="mt-8 inline-flex rounded-xl border border-white/15 px-5 py-3 font-semibold text-white hover:bg-white/5">Volver a la tienda</Link>
         </div>

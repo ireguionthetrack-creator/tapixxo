@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SignOutButton } from "@/app/components/sign-out-button";
+import { LiquidLoader } from "@/app/components/liquid-loader";
 import { TapixxoMark } from "@/app/components/tapixxo-brand";
 import { createClient } from "@/lib/supabase/client";
 
@@ -89,7 +90,7 @@ export default function AdminCodesPage() {
   }
 
   if (checkingAccess) {
-    return <main className="tapixxo-shell flex min-h-screen items-center justify-center text-sm text-gray-400">Verificando acceso...</main>;
+    return <main className="tapixxo-shell flex min-h-screen items-center justify-center"><LiquidLoader /></main>;
   }
 
   return (
@@ -104,7 +105,6 @@ export default function AdminCodesPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Link href="/admin/stock" className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm hover:border-orange-400/40">Stock</Link>
             <Link href="/companies" className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm hover:border-orange-400/40">Empresas</Link>
             <SignOutButton />
           </div>

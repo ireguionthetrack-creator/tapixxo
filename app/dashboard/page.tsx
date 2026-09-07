@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { LiquidLoader } from "@/app/components/liquid-loader";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -77,10 +78,8 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-950 text-white">
-        <p className="text-gray-400">
-          Cargando...
-        </p>
+      <main className="tapixxo-shell flex min-h-screen items-center justify-center">
+        <LiquidLoader />
       </main>
     );
   }

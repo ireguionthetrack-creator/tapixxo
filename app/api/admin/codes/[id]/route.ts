@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -51,7 +52,31 @@ async function getAdminClient() {
     };
   }
 
-  return { supabaseAdmin };
+  return { supabaseAdmin, user };
+}
+
+async function verifyAdminPassword(user: { id: string; email?: string | null }, password: unknown) {
+  if (typeof password !== "string" || password.length === 0 || !user.email) {
+    return false;
+  }
+
+  const verifier = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+  const { data, error } = await verifier.auth.signInWithPassword({
+    email: user.email,
+    password,
+  });
+
+  return !error && data.user?.id === user.id;
 }
 
 export async function PATCH(
@@ -140,7 +165,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -154,6 +179,14 @@ export async function DELETE(
     }
 
     const { id: codeId } = await params;
+    const body = await request.json().catch(() => null);
+
+    if (!(await verifyAdminPassword(authorization.user, body?.password))) {
+      return NextResponse.json(
+        { error: "La contraseña de administrador es incorrecta." },
+        { status: 403 },
+      );
+    }
 
     if (!codeId) {
       return NextResponse.json(

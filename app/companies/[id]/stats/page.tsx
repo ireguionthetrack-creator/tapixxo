@@ -7,6 +7,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AnalyticsChart } from "@/app/components/analytics-chart";
 import { SignOutButton } from "@/app/components/sign-out-button";
+import { LiquidLoader } from "@/app/components/liquid-loader";
 
 type Company = {
   id: string;
@@ -171,10 +172,8 @@ for (const group of groupsResult.data ?? []) {
 
   if (loading) {
     return (
-      <main className="tapixxo-shell flex min-h-screen items-center justify-center p-8 text-white">
-        <p className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-gray-400">
-          Cargando estadísticas...
-        </p>
+      <main className="tapixxo-shell flex min-h-screen items-center justify-center p-8">
+        <LiquidLoader />
       </main>
     );
   }
