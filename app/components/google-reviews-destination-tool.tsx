@@ -45,12 +45,36 @@ function GooglePlaceSummary({ place }: { place: GooglePlace }) {
   );
 }
 
+function GoogleMark() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 shrink-0">
+      <path
+        fill="#4285F4"
+        d="M21.35 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h5.23a4.47 4.47 0 0 1-1.94 2.94v2.79h3.6c2.1-1.94 3.31-4.8 3.31-7.76Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 21.75c2.62 0 4.82-.87 6.43-2.37l-3.6-2.79c-1 .67-2.27 1.07-3.78 1.07-2.9 0-5.36-1.96-6.24-4.59H1.1v2.88A9.75 9.75 0 0 0 12 21.75Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M4.81 13.07A5.86 5.86 0 0 1 4.48 12c0-.37.06-.73.17-1.07V8.05H1.1A9.75 9.75 0 0 0 1.1 15.95l3.71-2.88Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 6.34c1.62 0 3.07.56 4.21 1.66l3.16-3.16C16.82 2.45 14.62 1.25 12 1.25A9.75 9.75 0 0 0 1.1 8.05l3.71 2.88C5.69 8.3 8.15 6.34 12 6.34Z"
+      />
+    </svg>
+  );
+}
+
 export function GoogleReviewsDestinationTool({
   companyId,
   codes,
   onCodesUpdated,
 }: GoogleReviewsDestinationToolProps) {
   const searchCache = useRef(new Map<string, GooglePlace[]>());
+  const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GooglePlace[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<GooglePlace | null>(null);
@@ -295,24 +319,60 @@ export function GoogleReviewsDestinationTool({
     orderedCodes.length > 0 && selectedCodeIds.size === orderedCodes.length;
 
   return (
-    <section className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-1 rounded-2xl p-5 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-orange-300">
-            Destino inteligente
-          </p>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight">
-            Consigue más reseñas
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-            Encuentra tu negocio en Google y conecta tus placas en segundos.
-          </p>
-        </div>
-        <span className="inline-flex w-fit items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-gray-300">
-          <span translate="no">Google Maps</span>&nbsp;Reviews
+    <section className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-1 overflow-hidden rounded-2xl">
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls="google-reviews-menu"
+        onClick={() => setIsOpen((open) => !open)}
+        className="group flex min-h-24 w-full items-center gap-3 px-4 py-4 text-left transition duration-300 hover:bg-white/[0.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300/70 sm:min-h-28 sm:gap-4 sm:px-6"
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.1] shadow-[inset_0_1px_1px_rgba(255,255,255,0.23),0_10px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl transition duration-300 group-hover:border-white/25 group-hover:bg-white/[0.15]">
+          <GoogleMark />
         </span>
-      </div>
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-xs font-medium uppercase tracking-[0.16em] text-orange-300">
+              Destino inteligente
+            </span>
+            {connectedDestination && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.85)]" />
+                Conectado
+              </span>
+            )}
+          </span>
+          <span className="mt-1 block truncate text-lg font-semibold tracking-tight text-white sm:text-xl">
+            Google Reviews
+          </span>
+          <span className="mt-1 block truncate text-sm text-gray-400">
+            {connectedDestination
+              ? connectedDestination.business_name
+              : "Conecta tus placas para conseguir más reseñas."}
+          </span>
+        </span>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/15 text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition duration-300 group-hover:border-orange-300/35 group-hover:bg-orange-300/[0.1] group-hover:text-orange-100">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className={`h-5 w-5 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </span>
+      </button>
 
+      <div
+        id="google-reviews-menu"
+        className={`grid transition-[grid-template-rows,opacity] duration-500 ease-out ${
+          isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="border-t border-white/[0.08] px-4 pb-5 pt-5 sm:px-6 sm:pb-6">
       {loadingConnection ? (
         <div className="mt-5 h-20 animate-pulse rounded-2xl border border-white/[0.07] bg-white/[0.035]" />
       ) : connectedDestination && !confirmedPlace ? (
@@ -376,7 +436,7 @@ export function GoogleReviewsDestinationTool({
                     setSearching(false);
                     setSuccess("");
                   }}
-                  placeholder="Ej. Texas Resto Bar Cartagena"
+                  placeholder="Ej. Tapixxo Resto Bar Cartagena"
                   autoComplete="off"
                   className="min-h-12 w-full rounded-2xl border border-white/10 bg-black/30 py-3 pl-12 pr-4 text-white outline-none transition placeholder:text-gray-600 focus:border-orange-400/60 focus:bg-black/40"
                 />
@@ -539,6 +599,9 @@ export function GoogleReviewsDestinationTool({
           ✓ Google Reviews conectado. Tus clientes ya pueden tocar o escanear sus placas para dejar una reseña.
         </p>
       )}
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
