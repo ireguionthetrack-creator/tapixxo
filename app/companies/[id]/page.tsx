@@ -89,6 +89,14 @@ export default function CompanyPage() {
   const [savingGroup, setSavingGroup] =
     useState(false);
 
+  const [codeSearch, setCodeSearch] = useState("");
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(
+    new Set()
+  );
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
+  const [replacementGroupId, setReplacementGroupId] = useState("");
+  const [savingGroupDeletion, setSavingGroupDeletion] = useState(false);
+
   const [showCodeForm, setShowCodeForm] =
     useState(false);
 
@@ -581,29 +589,91 @@ export default function CompanyPage() {
       return;
     }
 
+    if (groups.length >= 5) {
+      setError("Cada empresa puede tener un máximo de 5 grupos.");
+      return;
+    }
+
     setSavingGroup(true);
     setError("");
 
-    const { error } = await supabase
-      .from("code_groups")
-      .insert({
-        company_id: companyId,
-        name: groupName.trim(),
-        description:
-          groupDescription.trim() || null,
+    try {
+      const response = await fetch(`/api/companies/${companyId}/groups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: groupName.trim(),
+          description: groupDescription.trim() || null,
+        }),
       });
+      const result = await response.json();
 
-    if (error) {
-      setError(error.message);
-    } else {
+      if (!response.ok) {
+        setError(result.error ?? "No se pudo crear el grupo.");
+        return;
+      }
+
       setGroupName("");
       setGroupDescription("");
       setShowGroupForm(false);
-
       await loadGroups();
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setSavingGroup(false);
+    }
+  }
+
+  function toggleGroupCodes(groupId: string) {
+    setExpandedGroupIds((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }
+
+  async function deleteGroup(group: Group) {
+    if (!replacementGroupId) {
+      setError("Selecciona el grupo al que migrar los códigos.");
+      return;
     }
 
-    setSavingGroup(false);
+    setSavingGroupDeletion(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/companies/${companyId}/groups/${group.id}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ replacementGroupId }),
+        }
+      );
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error ?? "No se pudo eliminar el grupo.");
+        return;
+      }
+
+      setDeletingGroupId(null);
+      setReplacementGroupId("");
+      setExpandedGroupIds((current) => {
+        const next = new Set(current);
+        next.delete(group.id);
+        return next;
+      });
+      await Promise.all([loadGroups(), loadCodes(), loadScanCounts()]);
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setSavingGroupDeletion(false);
+    }
   }
 
   /*
@@ -844,6 +914,21 @@ export default function CompanyPage() {
     }
   }
 
+  const normalizedCodeSearch = codeSearch.trim().toUpperCase();
+  const codesByGroupId = new Map<string, Code[]>();
+  for (const code of codes) {
+    const groupCodes = codesByGroupId.get(code.group_id) ?? [];
+    groupCodes.push(code);
+    codesByGroupId.set(code.group_id, groupCodes);
+  }
+  const visibleGroups = normalizedCodeSearch
+    ? groups.filter((group) =>
+        (codesByGroupId.get(group.id) ?? []).some((code) =>
+          code.code.toUpperCase().includes(normalizedCodeSearch)
+        )
+      )
+    : groups;
+
   /*
    * ----------------------------------------------------
    * LOADING
@@ -1063,7 +1148,7 @@ export default function CompanyPage() {
               </p>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
 
               {/* ADMIN Y COMPANY */}
 
@@ -1073,11 +1158,14 @@ export default function CompanyPage() {
                     !showGroupForm
                   )
                 }
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold transition hover:border-orange-400/40 hover:bg-orange-400/10"
+                disabled={groups.length >= 5 && !showGroupForm}
+                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold transition hover:border-orange-400/40 hover:bg-orange-400/10 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {showGroupForm
                   ? "Cancelar"
-                  : "Nuevo grupo"}
+                  : groups.length >= 5
+                    ? "Límite de grupos"
+                    : "Nuevo grupo"}
               </button>
 
               {/* SOLO ADMIN */}
@@ -1099,6 +1187,39 @@ export default function CompanyPage() {
 
             </div>
 
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <label className="relative block w-full sm:max-w-sm">
+              <span className="sr-only">Buscar código</span>
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-500"
+              >
+                ⌕
+              </span>
+              <input
+                type="search"
+                value={codeSearch}
+                onChange={(event) => setCodeSearch(event.target.value)}
+                placeholder="Buscar código"
+                className="w-full rounded-xl border border-white/10 bg-black/30 py-2.5 pl-10 pr-10 text-sm text-white outline-none transition placeholder:text-gray-500 focus:border-orange-400/60"
+              />
+              {codeSearch && (
+                <button
+                  type="button"
+                  onClick={() => setCodeSearch("")}
+                  className="absolute inset-y-0 right-2 flex min-h-10 min-w-10 items-center justify-center rounded-lg text-lg text-gray-400 transition hover:bg-white/10 hover:text-white"
+                  aria-label="Limpiar búsqueda"
+                >
+                  ×
+                </button>
+              )}
+            </label>
+
+            <p className="text-xs text-gray-500">
+              {groups.length} de 5 grupos
+            </p>
           </div>
 
           {/* FORMULARIO GRUPO */}
@@ -1341,11 +1462,33 @@ export default function CompanyPage() {
                 </p>
               </div>
 
+            ) : visibleGroups.length === 0 ? (
+
+              <div className="rounded-2xl border border-dashed border-white/15 bg-black/15 p-10 text-center">
+                <p className="text-gray-400">
+                  No encontramos códigos con “{codeSearch.trim()}”.
+                </p>
+              </div>
+
             ) : (
 
               <div className="space-y-3">
 
-                {groups.map((group) => (
+                {visibleGroups.map((group) => {
+                  const groupCodes = codesByGroupId.get(group.id) ?? [];
+                  const matchingCodes = normalizedCodeSearch
+                    ? groupCodes.filter((code) =>
+                        code.code.toUpperCase().includes(normalizedCodeSearch)
+                      )
+                    : groupCodes;
+                  const canCollapse = groupCodes.length > 3;
+                  const isExpanded = expandedGroupIds.has(group.id);
+                  const displayedCodes =
+                    canCollapse && !isExpanded && !normalizedCodeSearch
+                      ? matchingCodes.slice(0, 3)
+                      : matchingCodes;
+
+                  return (
 
                   <div
                     key={group.id}
@@ -1370,15 +1513,37 @@ export default function CompanyPage() {
 
                       <div className="flex items-center gap-2">
                         <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs text-gray-400">
-                          {
-                            codes.filter(
-                              (code) =>
-                                code.group_id ===
-                                group.id
-                            ).length
-                          }{" "}
+                          {groupCodes.length}{" "}
                           códigos
                         </span>
+
+                        {canCollapse && (
+                          <button
+                            type="button"
+                            onClick={() => toggleGroupCodes(group.id)}
+                            aria-expanded={isExpanded}
+                            className="group inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.16] bg-gradient-to-br from-white/[0.18] via-white/[0.08] to-white/[0.02] text-gray-200 shadow-[0_10px_26px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.24)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:border-orange-300/60 hover:from-orange-300/25 hover:via-orange-400/15 hover:to-white/[0.06] hover:text-white hover:shadow-[0_14px_30px_rgba(249,115,22,0.18),inset_0_1px_0_rgba(255,255,255,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300/70"
+                            title={isExpanded ? "Recoger códigos" : "Desplegar códigos"}
+                          >
+                            <svg
+                              aria-hidden="true"
+                              viewBox="0 0 24 24"
+                              className={`h-5 w-5 transition-transform duration-300 ease-out ${
+                                isExpanded ? "rotate-180" : ""
+                              }`}
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="m6 9 6 6 6-6" />
+                            </svg>
+                            <span className="sr-only">
+                              {isExpanded ? "Recoger códigos" : "Desplegar códigos"}
+                            </span>
+                          </button>
+                        )}
 
                         {role === "admin" && (
                           <a
@@ -1391,19 +1556,76 @@ export default function CompanyPage() {
                             <span className="sr-only">Descargar paquete QR de {group.name}</span>
                           </a>
                         )}
+
+                        {groups.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeletingGroupId(group.id);
+                              setReplacementGroupId("");
+                              setError("");
+                            }}
+                            className="inline-flex min-h-10 items-center rounded-xl border border-red-400/25 px-3 py-2 text-xs font-semibold text-red-200 transition hover:border-red-400/60 hover:bg-red-400/10"
+                          >
+                            Eliminar grupo
+                          </button>
+                        )}
                       </div>
 
                     </div>
 
+                    {deletingGroupId === group.id && (
+                      <div className="mt-4 rounded-xl border border-red-400/25 bg-red-400/[0.06] p-4">
+                        <p className="text-sm font-medium text-red-100">
+                          Eliminar “{group.name}”
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-gray-400">
+                          Sus {groupCodes.length} códigos se migrarán al grupo que selecciones.
+                        </p>
+                        <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                          <select
+                            value={replacementGroupId}
+                            onChange={(event) => setReplacementGroupId(event.target.value)}
+                            disabled={savingGroupDeletion}
+                            className="min-h-11 flex-1 rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white outline-none focus:border-orange-400/60 disabled:opacity-50"
+                          >
+                            <option value="">Migrar códigos a…</option>
+                            {groups
+                              .filter((targetGroup) => targetGroup.id !== group.id)
+                              .map((targetGroup) => (
+                                <option key={targetGroup.id} value={targetGroup.id}>
+                                  {targetGroup.name}
+                                </option>
+                              ))}
+                          </select>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeletingGroupId(null);
+                                setReplacementGroupId("");
+                              }}
+                              disabled={savingGroupDeletion}
+                              className="min-h-11 rounded-xl border border-white/10 px-4 text-sm transition hover:bg-white/[0.06] disabled:opacity-50"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteGroup(group)}
+                              disabled={savingGroupDeletion || !replacementGroupId}
+                              className="min-h-11 rounded-xl bg-red-500 px-4 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {savingGroupDeletion ? "Migrando..." : "Migrar y eliminar"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="mt-4 space-y-2">
 
-                      {codes
-                        .filter(
-                          (code) =>
-                            code.group_id ===
-                            group.id
-                        )
-                        .map((code) => (
+                      {displayedCodes.map((code) => (
 
                           <div
                             id={`code-${code.id}`}
@@ -1552,23 +1774,36 @@ export default function CompanyPage() {
                                       Destino
                                     </label>
 
-                                    <input
-                                      type="url"
-                                      value={
-                                        editingDestination
-                                      }
-                                      onChange={(
-                                        event
-                                      ) =>
-                                        setEditingDestination(
+                                    <div className="relative">
+                                      <input
+                                        type="url"
+                                        value={
+                                          editingDestination
+                                        }
+                                        onChange={(
                                           event
-                                            .target
-                                            .value
-                                        )
-                                      }
-                                      placeholder="https://ejemplo.com"
-                                      className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-orange-400/60"
-                                    />
+                                        ) =>
+                                          setEditingDestination(
+                                            event
+                                              .target
+                                              .value
+                                          )
+                                        }
+                                        placeholder="https://ejemplo.com"
+                                        className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-12 text-white outline-none focus:border-orange-400/60"
+                                      />
+                                      {editingDestination && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingDestination("")}
+                                          className="absolute inset-y-0 right-1 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-xl text-gray-400 transition hover:bg-white/10 hover:text-white"
+                                          aria-label="Eliminar enlace"
+                                          title="Eliminar enlace"
+                                        >
+                                          ×
+                                        </button>
+                                      )}
+                                    </div>
 
                                   </div>
 
@@ -1731,13 +1966,45 @@ export default function CompanyPage() {
 
                           </div>
 
-                        ))}
+                      ))}
 
                     </div>
 
+                    {canCollapse && !normalizedCodeSearch && (
+                      <button
+                        type="button"
+                        onClick={() => toggleGroupCodes(group.id)}
+                        aria-expanded={isExpanded}
+                        className="group mt-4 flex min-h-12 w-full items-center justify-between rounded-2xl border border-white/[0.14] bg-gradient-to-r from-white/[0.1] via-white/[0.045] to-orange-300/[0.055] px-4 text-left text-sm font-medium text-gray-200 shadow-[0_10px_28px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:border-orange-300/55 hover:from-white/[0.16] hover:via-orange-300/[0.1] hover:to-orange-400/[0.14] hover:shadow-[0_16px_34px_rgba(249,115,22,0.14),inset_0_1px_0_rgba(255,255,255,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300/70"
+                      >
+                        <span>
+                          {isExpanded
+                            ? "Recoger códigos"
+                            : `Ver ${groupCodes.length - displayedCodes.length} código${groupCodes.length - displayedCodes.length === 1 ? "" : "s"} más`}
+                        </span>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.14] bg-white/[0.08] text-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] transition duration-300 group-hover:bg-orange-300/20">
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            className={`h-4 w-4 transition-transform duration-300 ease-out ${
+                              isExpanded ? "rotate-180" : ""
+                            }`}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </span>
+                      </button>
+                    )}
+
                   </div>
 
-                ))}
+                );
+                })}
 
               </div>
 
