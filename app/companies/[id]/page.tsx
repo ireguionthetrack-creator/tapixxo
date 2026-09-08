@@ -13,6 +13,7 @@ import { SignOutButton } from "@/app/components/sign-out-button";
 import { CompanyAvatar } from "@/app/components/company-avatar";
 import { CompanyAvatarUpload } from "@/app/components/company-avatar-upload";
 import { LiquidLoader } from "@/app/components/liquid-loader";
+import { GoogleReviewsDestinationTool } from "@/app/components/google-reviews-destination-tool";
 
 type Company = {
   id: string;
@@ -43,6 +44,12 @@ type Code = {
   created_at: string;
   qr_png_path: string | null;
 };
+
+// Mantiene la jerarquía humana de los códigos: M2 aparece antes de M10.
+const codeNumberOrder = new Intl.Collator("es", {
+  numeric: true,
+  sensitivity: "base",
+});
 
 export default function CompanyPage() {
   const params = useParams();
@@ -1132,6 +1139,14 @@ export default function CompanyPage() {
 
         </div>
 
+        <div className="mt-8">
+          <GoogleReviewsDestinationTool
+            companyId={companyId}
+            codes={codes}
+            onCodesUpdated={() => void loadCodes()}
+          />
+        </div>
+
         {/* GRUPOS */}
 
         <section className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-3 mt-8 rounded-2xl p-5 sm:p-6">
@@ -1475,7 +1490,11 @@ export default function CompanyPage() {
               <div className="space-y-3">
 
                 {visibleGroups.map((group) => {
-                  const groupCodes = codesByGroupId.get(group.id) ?? [];
+                  const groupCodes = [
+                    ...(codesByGroupId.get(group.id) ?? []),
+                  ].sort((firstCode, secondCode) =>
+                    codeNumberOrder.compare(firstCode.code, secondCode.code)
+                  );
                   const matchingCodes = normalizedCodeSearch
                     ? groupCodes.filter((code) =>
                         code.code.toUpperCase().includes(normalizedCodeSearch)

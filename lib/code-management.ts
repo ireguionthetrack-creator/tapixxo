@@ -14,7 +14,7 @@ export async function getCodeManagementAccess(
   userId: string | null,
   code: CodeOwnership
 ) {
-  if (!userId) return { canManage: false, companyId: null };
+  if (!userId) return { canManage: false, companyId: null, role: null };
 
   const admin = createAdminClient();
   const [{ data: profile }, { data: group }] = await Promise.all([
@@ -34,7 +34,7 @@ export async function getCodeManagementAccess(
 
   const companyId = code.company_id ?? group?.company_id ?? null;
   if (profile?.role === "admin") {
-    return { canManage: true, companyId };
+    return { canManage: true, companyId, role: "admin" };
   }
 
   return {
@@ -42,6 +42,7 @@ export async function getCodeManagementAccess(
       profile?.role === "company" && companyId && profile.company_id === companyId
     ),
     companyId,
+    role: profile?.role ?? null,
   };
 }
 

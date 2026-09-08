@@ -66,6 +66,7 @@ export async function GET(
       const editModeCompanyId = cookieStore.get(CODE_EDIT_MODE_COOKIE)?.value;
       if (
         access.canManage &&
+        access.role === "company" &&
         access.companyId &&
         editModeCompanyId === access.companyId
       ) {

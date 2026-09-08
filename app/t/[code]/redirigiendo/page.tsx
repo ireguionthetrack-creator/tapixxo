@@ -16,6 +16,11 @@ type RedirectableCode = {
   group_id: string | null;
 };
 
+type CompanyIdentity = {
+  name: string;
+  profile_image_path: string | null;
+};
+
 async function getSignedInUserId() {
   const cookieStore = await cookies();
   const supabaseAuth = createServerClient(
@@ -55,6 +60,7 @@ export default async function RedirectingCodePage({
     const cookieStore = await cookies();
     if (
       !access.canManage ||
+      access.role !== "company" ||
       !access.companyId ||
       cookieStore.get(CODE_EDIT_MODE_COOKIE)?.value !== access.companyId
     ) {
@@ -69,9 +75,16 @@ export default async function RedirectingCodePage({
 
   await admin.from("code_scans").insert({ code_id: code.id });
 
+  const { data: company } = await admin
+    .from("companies")
+    .select("name, profile_image_path")
+    .eq("id", access.companyId)
+    .maybeSingle();
+
   return (
     <RedirectingCodeContent
-      destinationUrl={code.destination_url}
+      code={code.code}
+      company={company as CompanyIdentity | null}
       configureUrl={`/companies/${access.companyId}?editCode=${encodeURIComponent(code.id)}`}
     />
   );

@@ -43,5 +43,5 @@ export async function getCompanyGroupManagementAccess(companyId: string) {
     return { error: "No tienes permisos para gestionar estos grupos.", status: 403 as const };
   }
 
-  return { admin };
+  return { admin, userId: user.id };
 }

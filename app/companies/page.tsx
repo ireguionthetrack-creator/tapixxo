@@ -36,6 +36,10 @@ export default function CompaniesPage() {
   const [checkingAccess, setCheckingAccess] =
     useState(true);
   const [saving, setSaving] = useState(false);
+  const [companyToRename, setCompanyToRename] =
+    useState<Company | null>(null);
+  const [companyNameToSave, setCompanyNameToSave] = useState("");
+  const [renaming, setRenaming] = useState(false);
   const [companyToDelete, setCompanyToDelete] =
     useState<Company | null>(null);
   const [adminPassword, setAdminPassword] = useState("");
@@ -261,6 +265,54 @@ export default function CompaniesPage() {
     }
   }
 
+  async function renameCompany(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!companyToRename) return;
+
+    const name = companyNameToSave.trim();
+    if (!name) {
+      setError("Introduce el nombre de la empresa.");
+      return;
+    }
+
+    setRenaming(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(
+        `/api/admin/companies/${companyToRename.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        }
+      );
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error ?? "No se pudo actualizar la empresa.");
+        return;
+      }
+
+      setCompanies((currentCompanies) =>
+        currentCompanies.map((company) =>
+          company.id === result.company.id
+            ? { ...company, name: result.company.name }
+            : company
+        )
+      );
+      setSuccess(`El nombre se actualizó a “${result.company.name}”.`);
+      setCompanyToRename(null);
+      setCompanyNameToSave("");
+    } catch {
+      setError("No se pudo conectar con el servidor.");
+    } finally {
+      setRenaming(false);
+    }
+  }
+
   /*
    * Mientras comprobamos si el usuario es administrador,
    * no mostramos el contenido administrativo.
@@ -447,13 +499,26 @@ export default function CompaniesPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <Link
                       href={`/companies/${company.id}`}
                       className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium transition hover:border-orange-400/40 hover:bg-orange-400/10"
                     >
                       Abrir
                     </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCompanyToRename(company);
+                        setCompanyNameToSave(company.name);
+                        setError("");
+                        setSuccess("");
+                      }}
+                      className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium transition hover:border-orange-400/40 hover:bg-orange-400/10"
+                    >
+                      Editar nombre
+                    </button>
 
                     <button
                       type="button"
@@ -474,6 +539,60 @@ export default function CompaniesPage() {
           )}
         </section>
       </div>
+
+      {companyToRename && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-5 backdrop-blur-sm">
+          <form
+            onSubmit={renameCompany}
+            className="w-full max-w-md rounded-2xl border border-orange-400/25 bg-[#15120f] p-6 shadow-2xl"
+          >
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-orange-300">
+              Administración
+            </p>
+            <h2 className="mt-2 text-xl font-semibold text-white">
+              Cambiar nombre de empresa
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-gray-400">
+              Este nombre se mostrará en el panel y en las páginas públicas de sus placas.
+            </p>
+
+            <label className="mt-5 block text-sm text-gray-300">
+              Nombre de la empresa
+              <input
+                type="text"
+                value={companyNameToSave}
+                onChange={(event) => setCompanyNameToSave(event.target.value)}
+                maxLength={120}
+                autoComplete="organization"
+                autoFocus
+                disabled={renaming}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-orange-400/60 disabled:opacity-50"
+              />
+            </label>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={renaming}
+                onClick={() => {
+                  setCompanyToRename(null);
+                  setCompanyNameToSave("");
+                }}
+                className="rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.06] disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={renaming || !companyNameToSave.trim()}
+                className="rounded-xl bg-orange-400 px-4 py-3 text-sm font-semibold text-black transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {renaming ? "Guardando..." : "Guardar nombre"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {companyToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-5 backdrop-blur-sm">

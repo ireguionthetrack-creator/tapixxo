@@ -4,6 +4,107 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const cookieStore = await cookies();
+    const supabaseAuth = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => {
+                cookieStore.set(name, value, options);
+              });
+            } catch {
+              // Las cookies no se pueden modificar en todos los contextos.
+            }
+          },
+        },
+      }
+    );
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseAuth.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "No estás autenticado." },
+        { status: 401 }
+      );
+    }
+
+    const supabaseAdmin = createAdminClient();
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || profile?.role !== "admin") {
+      return NextResponse.json(
+        { error: "No tienes permisos para editar empresas." },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json();
+    const name = String(body.name ?? "").trim();
+
+    if (!name || name.length > 120) {
+      return NextResponse.json(
+        { error: "El nombre debe tener entre 1 y 120 caracteres." },
+        { status: 400 }
+      );
+    }
+
+    const { id: companyId } = await params;
+    const { data: company, error: companyError } = await supabaseAdmin
+      .from("companies")
+      .update({ name })
+      .eq("id", companyId)
+      .select("id, name")
+      .maybeSingle();
+
+    if (companyError) {
+      console.error("Admin company rename failed", {
+        code: companyError.code,
+        message: companyError.message,
+      });
+      return NextResponse.json(
+        { error: "No se pudo actualizar el nombre de la empresa." },
+        { status: 500 }
+      );
+    }
+
+    if (!company) {
+      return NextResponse.json(
+        { error: "La empresa no existe." },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ company });
+  } catch (error) {
+    console.error("Admin company rename unexpected error", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return NextResponse.json(
+      { error: "Error interno al actualizar la empresa." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

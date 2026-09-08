@@ -5,6 +5,7 @@ import { createServerClient } from "@supabase/ssr";
 import { CompanyAvatar } from "@/app/components/company-avatar";
 import { TapixxoBrand } from "@/app/components/tapixxo-brand";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { CODE_EDIT_MODE_COOKIE } from "@/lib/code-edit-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ export default async function UnconfiguredCodePage({
 }) {
   const { code: requestedCode } = await params;
   const userId = await getSignedInUserId();
+  const cookieStore = await cookies();
   const admin = createAdminClient();
 
   const { data: code, error: codeError } = await admin
@@ -96,7 +98,8 @@ export default async function UnconfiguredCodePage({
   const canConfigure =
     profile?.role === "company" &&
     Boolean(companyId) &&
-    profile.company_id === companyId;
+    profile.company_id === companyId &&
+    cookieStore.get(CODE_EDIT_MODE_COOKIE)?.value === companyId;
 
   return (
     <main className="tapixxo-shell tapixxo-grid flex min-h-screen items-center justify-center px-5 py-10 text-white">
