@@ -22,7 +22,8 @@ export type GooglePlaceSearchResult = {
 };
 
 export type GoogleReviewPlace = GooglePlaceSearchResult & {
-  writeAReviewUri: string;
+  reviewUrl: string;
+  googleMapsWriteAReviewUri: string | null;
 };
 
 type CachedValue<T> = { expiresAt: number; value: T };
@@ -70,6 +71,16 @@ export function isOfficialGoogleReviewUrl(value: string) {
   } catch {
     return false;
   }
+}
+
+const GOOGLE_PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{10,255}$/;
+
+/** Construye el destino navegador-first solo para Place IDs con formato seguro. */
+export function buildGoogleWriteReviewUrl(placeId: string) {
+  const normalizedPlaceId = placeId.trim();
+  if (!GOOGLE_PLACE_ID_PATTERN.test(normalizedPlaceId)) return null;
+
+  return `https://search.google.com/local/writereview?placeid=${encodeURIComponent(normalizedPlaceId)}`;
 }
 
 function toSearchResult(place: GooglePlacesApiPlace): GooglePlaceSearchResult | null {
@@ -149,7 +160,8 @@ const SEARCH_FIELD_MASK = [
   "places.formattedAddress",
 ].join(",");
 
-// writeAReviewUri es el único detalle adicional imprescindible. Activa Place Details Pro.
+// writeAReviewUri se conserva solamente como fallback. La URL principal se
+// construye con el Place ID para abrir el formulario en navegador.
 const DETAILS_FIELD_MASK = [
   "id",
   "displayName.text",
@@ -228,21 +240,26 @@ export async function getGoogleReviewPlace(placeId: string) {
       2000
     );
 
-    if (!place || place.placeId !== placeId || !writeAReviewUri) {
+    const reviewUrl = buildGoogleWriteReviewUrl(placeId);
+    if (!place || place.placeId !== placeId || !reviewUrl) {
       throw new GooglePlacesError(
         "Google no devolvió la información necesaria del negocio.",
         "upstream"
       );
     }
-    if (!isOfficialGoogleReviewUrl(writeAReviewUri)) {
+
+    if (writeAReviewUri && !isOfficialGoogleReviewUrl(writeAReviewUri)) {
       console.error("Google Places returned an unexpected review URL host");
-      throw new GooglePlacesError(
-        "Google no devolvió un enlace de reseñas válido.",
-        "upstream"
-      );
     }
 
-    const result = { ...place, writeAReviewUri } satisfies GoogleReviewPlace;
+    const result = {
+      ...place,
+      reviewUrl,
+      googleMapsWriteAReviewUri:
+        writeAReviewUri && isOfficialGoogleReviewUrl(writeAReviewUri)
+          ? writeAReviewUri
+          : null,
+    } satisfies GoogleReviewPlace;
     cacheValue(detailsCache, placeId, result, DETAILS_CACHE_TTL_MS, MAX_DETAILS_CACHE_ENTRIES);
     return result;
   })();

@@ -18,6 +18,7 @@ type StoredGoogleReviewDestination = {
   business_name: string;
   formatted_address: string | null;
   write_a_review_uri: string;
+  google_maps_write_a_review_uri: string | null;
 };
 
 function isMissingGoogleReviewTable(error: { code?: string } | null) {
@@ -41,7 +42,7 @@ export async function GET(
   const { data, error } = await access.admin
     .from("company_google_review_destinations")
     .select(
-      "google_place_id, business_name, formatted_address, write_a_review_uri, updated_at"
+      "google_place_id, business_name, formatted_address, write_a_review_uri, google_maps_write_a_review_uri, updated_at"
     )
     .eq("company_id", companyId)
     .maybeSingle();
@@ -109,7 +110,9 @@ export async function PUT(
     // más placas al mismo Place ID; no se consulta Google por segunda vez.
     const { data: storedDestination, error: storedDestinationError } = await access.admin
       .from("company_google_review_destinations")
-      .select("google_place_id, business_name, formatted_address, write_a_review_uri")
+      .select(
+        "google_place_id, business_name, formatted_address, write_a_review_uri, google_maps_write_a_review_uri"
+      )
       .eq("company_id", companyId)
       .maybeSingle();
 
@@ -137,7 +140,8 @@ export async function PUT(
             placeId: saved.google_place_id,
             businessName: saved.business_name,
             formattedAddress: saved.formatted_address,
-            writeAReviewUri: saved.write_a_review_uri,
+            reviewUrl: saved.write_a_review_uri,
+            googleMapsWriteAReviewUri: saved.google_maps_write_a_review_uri,
           }
         : await getGoogleReviewPlace(placeId);
 
@@ -151,7 +155,7 @@ export async function PUT(
         p_google_place_id: place.placeId,
         p_business_name: place.businessName,
         p_formatted_address: place.formattedAddress,
-        p_write_a_review_uri: place.writeAReviewUri,
+        p_write_a_review_uri: place.googleMapsWriteAReviewUri,
         p_code_ids: codeIds,
       })
       .maybeSingle();
