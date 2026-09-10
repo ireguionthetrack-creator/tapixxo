@@ -20,7 +20,7 @@ type ConnectedDestination = {
   google_place_id: string;
   business_name: string;
   formatted_address: string | null;
-  write_a_review_uri: string;
+  review_url: string;
   updated_at: string;
 };
 
@@ -122,7 +122,7 @@ export function GoogleReviewsDestinationTool({
           new Set(
             codes
               .filter(
-                (code) => code.destination_url === destination.write_a_review_uri
+                (code) => code.destination_url === destination.review_url
               )
               .map((code) => code.id)
           )
@@ -262,7 +262,7 @@ export function GoogleReviewsDestinationTool({
         google_place_id: result.destination.placeId,
         business_name: result.destination.businessName,
         formatted_address: result.destination.formattedAddress,
-        write_a_review_uri: "",
+        review_url: "",
         updated_at: new Date().toISOString(),
       });
     } catch {
@@ -305,7 +305,7 @@ export function GoogleReviewsDestinationTool({
         google_place_id: result.destination.placeId,
         business_name: result.destination.businessName,
         formatted_address: result.destination.formattedAddress,
-        write_a_review_uri: "",
+        review_url: "",
         updated_at: new Date().toISOString(),
       });
       setSuccess(

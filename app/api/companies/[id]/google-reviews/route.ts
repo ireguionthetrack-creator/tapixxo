@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  getGoogleReviewLinks,
-  GooglePlacesError,
-} from "@/lib/google-places";
+import { buildGoogleWriteReviewUrl } from "@/lib/google-places";
 import { getCompanyGroupManagementAccess } from "@/lib/company-group-management";
 import { verifyGooglePlaceSelectionToken } from "@/lib/google-place-selection";
 
@@ -18,11 +15,7 @@ type StoredGoogleReviewDestination = {
   google_place_id: string;
   business_name: string;
   formatted_address: string | null;
-  write_a_review_uri: string;
-  google_maps_write_a_review_uri: string | null;
-  google_maps_place_uri: string | null;
-  google_maps_reviews_uri: string | null;
-  review_url_refreshed_at: string | null;
+  review_url: string;
 };
 
 function isMissingGoogleReviewTable(error: { code?: string } | null) {
@@ -36,7 +29,7 @@ function isMissingGoogleReviewTable(error: { code?: string } | null) {
 }
 
 const DESTINATION_FIELDS =
-  "google_place_id, business_name, formatted_address, write_a_review_uri, google_maps_write_a_review_uri, google_maps_place_uri, google_maps_reviews_uri, review_url_refreshed_at, updated_at";
+  "google_place_id, business_name, formatted_address, review_url, updated_at";
 
 export async function GET(
   _request: Request,
@@ -71,69 +64,9 @@ export async function GET(
     );
   }
 
-  const destination = data as StoredGoogleReviewDestination | null;
-  if (!destination || destination.review_url_refreshed_at) {
-    return NextResponse.json({ destination });
-  }
-
-  try {
-    const links = await getGoogleReviewLinks(destination.google_place_id);
-    const { error: refreshError } = await access.admin.rpc(
-      "refresh_company_google_review_destination",
-      {
-        p_company_id: companyId,
-        p_write_a_review_uri: links.writeAReviewUri,
-        p_google_maps_place_uri: links.placeUri,
-        p_google_maps_reviews_uri: links.reviewsUri,
-      }
-    );
-
-    if (refreshError) {
-      console.error("Google review destination refresh failed", {
-        code: refreshError.code,
-        message: refreshError.message,
-      });
-      return NextResponse.json(
-        { error: "No se pudo actualizar el enlace oficial de Google Reviews." },
-        { status: 502 }
-      );
-    }
-
-    const { data: refreshed, error: refreshedError } = await access.admin
-      .from("company_google_review_destinations")
-      .select(DESTINATION_FIELDS)
-      .eq("company_id", companyId)
-      .maybeSingle();
-    if (refreshedError) {
-      console.error("Google review destination reload failed", {
-        code: refreshedError.code,
-        message: refreshedError.message,
-      });
-      return NextResponse.json(
-        { error: "No se pudo cargar el enlace oficial de Google Reviews." },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ destination: refreshed });
-  } catch (refreshException) {
-    if (refreshException instanceof GooglePlacesError) {
-      return NextResponse.json(
-        { error: refreshException.message },
-        { status: refreshException.kind === "configuration" ? 503 : 502 }
-      );
-    }
-    console.error("Google review destination refresh unexpected error", {
-      message:
-        refreshException instanceof Error
-          ? refreshException.message
-          : "Unknown error",
-    });
-    return NextResponse.json(
-      { error: "No se pudo actualizar el enlace oficial de Google Reviews." },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({
+    destination: data as StoredGoogleReviewDestination | null,
+  });
 }
 
 export async function PUT(
@@ -185,17 +118,22 @@ export async function PUT(
     );
   }
 
+  const reviewUrl = buildGoogleWriteReviewUrl(selection.placeId);
+  if (!reviewUrl) {
+    return NextResponse.json(
+      { error: "El identificador de Google no es válido." },
+      { status: 400 }
+    );
+  }
+
   try {
-    const links = await getGoogleReviewLinks(selection.placeId);
     const { data, error } = await access.admin
       .rpc("apply_company_google_review_destination", {
         p_company_id: companyId,
         p_google_place_id: selection.placeId,
         p_business_name: selection.businessName,
         p_formatted_address: selection.formattedAddress,
-        p_write_a_review_uri: links.writeAReviewUri,
-        p_google_maps_place_uri: links.placeUri,
-        p_google_maps_reviews_uri: links.reviewsUri,
+        p_write_a_review_uri: reviewUrl,
         p_code_ids: codeIds,
       })
       .maybeSingle();
@@ -235,13 +173,6 @@ export async function PUT(
       updatedCodes: result?.updated_codes ?? 0,
     });
   } catch (error) {
-    if (error instanceof GooglePlacesError) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.kind === "configuration" ? 503 : 502 }
-      );
-    }
-
     console.error("Google review destination unexpected error", {
       message: error instanceof Error ? error.message : "Unknown error",
     });

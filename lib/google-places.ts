@@ -8,11 +8,6 @@ type GooglePlacesApiPlace = {
   id?: unknown;
   displayName?: { text?: unknown };
   formattedAddress?: unknown;
-  googleMapsLinks?: {
-    writeAReviewUri?: unknown;
-    placeUri?: unknown;
-    reviewsUri?: unknown;
-  };
 };
 
 type GooglePlacesApiResponse = { places?: GooglePlacesApiPlace[] };
@@ -23,17 +18,10 @@ export type GooglePlaceSearchResult = {
   formattedAddress: string | null;
 };
 
-export type GoogleReviewLinks = {
-  writeAReviewUri: string;
-  placeUri: string | null;
-  reviewsUri: string | null;
-};
-
 type CachedValue<T> = { expiresAt: number; value: T };
 
 const searchCache = new Map<string, CachedValue<GooglePlaceSearchResult[]>>();
 const pendingSearches = new Map<string, Promise<GooglePlaceSearchResult[]>>();
-const pendingDetails = new Map<string, Promise<GoogleReviewLinks>>();
 
 export class GooglePlacesError extends Error {
   constructor(
@@ -62,20 +50,16 @@ function asText(value: unknown, maxLength: number) {
     : null;
 }
 
-export function isOfficialGoogleReviewUrl(value: string) {
-  try {
-    const url = new URL(value);
-    const hostname = url.hostname.toLowerCase();
-    return (
-      url.protocol === "https:" &&
-      (hostname === "google.com" || hostname.endsWith(".google.com"))
-    );
-  } catch {
-    return false;
-  }
-}
-
 const GOOGLE_PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{10,255}$/;
+
+/** Builds the Google review destination from a validated Place ID. */
+export function buildGoogleWriteReviewUrl(placeId: string) {
+  const normalizedPlaceId = placeId.trim();
+  if (!GOOGLE_PLACE_ID_PATTERN.test(normalizedPlaceId)) return null;
+
+  return "https://search.google.com/local/writereview?placeid=" +
+    encodeURIComponent(normalizedPlaceId);
+}
 
 function toSearchResult(place: GooglePlacesApiPlace): GooglePlaceSearchResult | null {
   const placeId = asText(place.id, 255);
@@ -118,7 +102,7 @@ function getCachedValue<T>(cache: Map<string, CachedValue<T>>, key: string) {
 }
 
 async function requestGooglePlaces(
-  operation: "text_search" | "place_details",
+  operation: "text_search",
   url: string,
   options: RequestInit,
   fieldMask: string
@@ -152,14 +136,6 @@ const SEARCH_FIELD_MASK = [
   "places.id",
   "places.displayName.text",
   "places.formattedAddress",
-].join(",");
-
-// Solo se solicitan los enlaces que se guardan. No se pide ningún dato de
-// negocio adicional durante la confirmación.
-const DETAILS_FIELD_MASK = [
-  "googleMapsLinks.writeAReviewUri",
-  "googleMapsLinks.reviewsUri",
-  "googleMapsLinks.placeUri",
 ].join(",");
 
 export async function searchGooglePlaces(query: string) {
@@ -204,66 +180,5 @@ export async function searchGooglePlaces(query: string) {
     return await search;
   } finally {
     pendingSearches.delete(cacheKey);
-  }
-}
-
-export async function getGoogleReviewLinks(placeId: string) {
-  const normalizedPlaceId = placeId.trim();
-  if (!GOOGLE_PLACE_ID_PATTERN.test(normalizedPlaceId)) {
-    throw new GooglePlacesError("El identificador de Google no es válido.", "upstream");
-  }
-
-  const pending = pendingDetails.get(normalizedPlaceId);
-  if (pending) {
-    console.info("Google Places details request coalesced");
-    return pending;
-  }
-
-  const details = (async () => {
-    const response = (await requestGooglePlaces(
-      "place_details",
-      `${GOOGLE_PLACES_BASE_URL}/places/${encodeURIComponent(normalizedPlaceId)}`,
-      { method: "GET" },
-      DETAILS_FIELD_MASK
-    )) as GooglePlacesApiPlace;
-    const writeAReviewUri = asText(
-      response.googleMapsLinks?.writeAReviewUri,
-      2000
-    );
-    const placeUri = asText(response.googleMapsLinks?.placeUri, 2000);
-    const reviewsUri = asText(response.googleMapsLinks?.reviewsUri, 2000);
-
-    if (!writeAReviewUri || !isOfficialGoogleReviewUrl(writeAReviewUri)) {
-      throw new GooglePlacesError(
-        "Google no devolvió un enlace oficial para escribir una reseña.",
-        "upstream"
-      );
-    }
-
-    const result = {
-      writeAReviewUri,
-      placeUri:
-        placeUri && isOfficialGoogleReviewUrl(placeUri) ? placeUri : null,
-      reviewsUri:
-        reviewsUri && isOfficialGoogleReviewUrl(reviewsUri) ? reviewsUri : null,
-    } satisfies GoogleReviewLinks;
-
-    if (process.env.NODE_ENV === "development") {
-      console.info("Google Places review links received", {
-        placeId,
-        writeAReviewUri: result.writeAReviewUri,
-        reviewsUri: result.reviewsUri,
-        placeUri: result.placeUri,
-      });
-    }
-
-    return result;
-  })();
-
-  pendingDetails.set(normalizedPlaceId, details);
-  try {
-    return await details;
-  } finally {
-    pendingDetails.delete(normalizedPlaceId);
   }
 }
