@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import {
-  getGoogleReviewPlace,
+  getGoogleReviewLinks,
   GooglePlacesError,
 } from "@/lib/google-places";
 import { getCompanyGroupManagementAccess } from "@/lib/company-group-management";
+import { verifyGooglePlaceSelectionToken } from "@/lib/google-place-selection";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type SaveGoogleReviewBody = {
-  placeId?: unknown;
+  selectionToken?: unknown;
   codeIds?: unknown;
 };
 
@@ -19,15 +20,23 @@ type StoredGoogleReviewDestination = {
   formatted_address: string | null;
   write_a_review_uri: string;
   google_maps_write_a_review_uri: string | null;
+  google_maps_place_uri: string | null;
+  google_maps_reviews_uri: string | null;
+  review_url_refreshed_at: string | null;
 };
 
 function isMissingGoogleReviewTable(error: { code?: string } | null) {
   return (
     error?.code === "42P01" ||
+    error?.code === "42703" ||
     error?.code === "PGRST205" ||
+    error?.code === "PGRST204" ||
     error?.code === "PGRST202"
   );
 }
+
+const DESTINATION_FIELDS =
+  "google_place_id, business_name, formatted_address, write_a_review_uri, google_maps_write_a_review_uri, google_maps_place_uri, google_maps_reviews_uri, review_url_refreshed_at, updated_at";
 
 export async function GET(
   _request: Request,
@@ -41,9 +50,7 @@ export async function GET(
 
   const { data, error } = await access.admin
     .from("company_google_review_destinations")
-    .select(
-      "google_place_id, business_name, formatted_address, write_a_review_uri, google_maps_write_a_review_uri, updated_at"
-    )
+    .select(DESTINATION_FIELDS)
     .eq("company_id", companyId)
     .maybeSingle();
 
@@ -64,7 +71,69 @@ export async function GET(
     );
   }
 
-  return NextResponse.json({ destination: data });
+  const destination = data as StoredGoogleReviewDestination | null;
+  if (!destination || destination.review_url_refreshed_at) {
+    return NextResponse.json({ destination });
+  }
+
+  try {
+    const links = await getGoogleReviewLinks(destination.google_place_id);
+    const { error: refreshError } = await access.admin.rpc(
+      "refresh_company_google_review_destination",
+      {
+        p_company_id: companyId,
+        p_write_a_review_uri: links.writeAReviewUri,
+        p_google_maps_place_uri: links.placeUri,
+        p_google_maps_reviews_uri: links.reviewsUri,
+      }
+    );
+
+    if (refreshError) {
+      console.error("Google review destination refresh failed", {
+        code: refreshError.code,
+        message: refreshError.message,
+      });
+      return NextResponse.json(
+        { error: "No se pudo actualizar el enlace oficial de Google Reviews." },
+        { status: 502 }
+      );
+    }
+
+    const { data: refreshed, error: refreshedError } = await access.admin
+      .from("company_google_review_destinations")
+      .select(DESTINATION_FIELDS)
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (refreshedError) {
+      console.error("Google review destination reload failed", {
+        code: refreshedError.code,
+        message: refreshedError.message,
+      });
+      return NextResponse.json(
+        { error: "No se pudo cargar el enlace oficial de Google Reviews." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ destination: refreshed });
+  } catch (refreshException) {
+    if (refreshException instanceof GooglePlacesError) {
+      return NextResponse.json(
+        { error: refreshException.message },
+        { status: refreshException.kind === "configuration" ? 503 : 502 }
+      );
+    }
+    console.error("Google review destination refresh unexpected error", {
+      message:
+        refreshException instanceof Error
+          ? refreshException.message
+          : "Unknown error",
+    });
+    return NextResponse.json(
+      { error: "No se pudo actualizar el enlace oficial de Google Reviews." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function PUT(
@@ -84,14 +153,13 @@ export async function PUT(
     return NextResponse.json({ error: "Solicitud no válida." }, { status: 400 });
   }
 
-  const placeId = typeof body.placeId === "string" ? body.placeId.trim() : "";
   const rawCodeIds = Array.isArray(body.codeIds) ? body.codeIds : [];
   const codeIds = [...new Set(rawCodeIds)].filter(
     (codeId): codeId is string =>
       typeof codeId === "string" && UUID_PATTERN.test(codeId)
   );
 
-  if (!placeId || placeId.length > 255 || codeIds.length !== rawCodeIds.length) {
+  if (codeIds.length !== rawCodeIds.length) {
     return NextResponse.json(
       { error: "El negocio o las placas seleccionadas no son válidos." },
       { status: 400 }
@@ -105,57 +173,29 @@ export async function PUT(
     );
   }
 
+  const selection = verifyGooglePlaceSelectionToken(
+    body.selectionToken,
+    companyId,
+    access.userId
+  );
+  if (!selection) {
+    return NextResponse.json(
+      { error: "La selección del negocio venció. Vuelve a buscarlo." },
+      { status: 400 }
+    );
+  }
+
   try {
-    // Una vez confirmado, el destino se reutiliza desde Supabase al vincular
-    // más placas al mismo Place ID; no se consulta Google por segunda vez.
-    const { data: storedDestination, error: storedDestinationError } = await access.admin
-      .from("company_google_review_destinations")
-      .select(
-        "google_place_id, business_name, formatted_address, write_a_review_uri, google_maps_write_a_review_uri"
-      )
-      .eq("company_id", companyId)
-      .maybeSingle();
-
-    if (storedDestinationError) {
-      if (isMissingGoogleReviewTable(storedDestinationError)) {
-        return NextResponse.json(
-          { error: "Falta aplicar la migración de Google Reviews." },
-          { status: 503 }
-        );
-      }
-      console.error("Google review destination lookup failed", {
-        code: storedDestinationError.code,
-        message: storedDestinationError.message,
-      });
-      return NextResponse.json(
-        { error: "No se pudo cargar la configuración de Google Reviews." },
-        { status: 500 }
-      );
-    }
-
-    const saved = storedDestination as StoredGoogleReviewDestination | null;
-    const place =
-      saved?.google_place_id === placeId
-        ? {
-            placeId: saved.google_place_id,
-            businessName: saved.business_name,
-            formattedAddress: saved.formatted_address,
-            reviewUrl: saved.write_a_review_uri,
-            googleMapsWriteAReviewUri: saved.google_maps_write_a_review_uri,
-          }
-        : await getGoogleReviewPlace(placeId);
-
-    console.info("Google review destination resolved", {
-      source: saved?.google_place_id === placeId ? "database" : "google_places",
-      companyId,
-    });
+    const links = await getGoogleReviewLinks(selection.placeId);
     const { data, error } = await access.admin
       .rpc("apply_company_google_review_destination", {
         p_company_id: companyId,
-        p_google_place_id: place.placeId,
-        p_business_name: place.businessName,
-        p_formatted_address: place.formattedAddress,
-        p_write_a_review_uri: place.googleMapsWriteAReviewUri,
+        p_google_place_id: selection.placeId,
+        p_business_name: selection.businessName,
+        p_formatted_address: selection.formattedAddress,
+        p_write_a_review_uri: links.writeAReviewUri,
+        p_google_maps_place_uri: links.placeUri,
+        p_google_maps_reviews_uri: links.reviewsUri,
         p_code_ids: codeIds,
       })
       .maybeSingle();
@@ -188,9 +228,9 @@ export async function PUT(
     const result = data as { updated_codes?: number } | null;
     return NextResponse.json({
       destination: {
-        placeId: place.placeId,
-        businessName: place.businessName,
-        formattedAddress: place.formattedAddress,
+        placeId: selection.placeId,
+        businessName: selection.businessName,
+        formattedAddress: selection.formattedAddress,
       },
       updatedCodes: result?.updated_codes ?? 0,
     });

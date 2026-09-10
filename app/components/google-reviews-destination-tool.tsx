@@ -13,6 +13,7 @@ type GooglePlace = {
   placeId: string;
   businessName: string;
   formattedAddress: string | null;
+  selectionToken: string;
 };
 
 type ConnectedDestination = {
@@ -243,7 +244,10 @@ export function GoogleReviewsDestinationTool({
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ placeId: selectedPlace.placeId, codeIds: [] }),
+          body: JSON.stringify({
+            selectionToken: selectedPlace.selectionToken,
+            codeIds: [],
+          }),
         }
       );
       const result = await response.json();
@@ -285,7 +289,7 @@ export function GoogleReviewsDestinationTool({
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            placeId: confirmedPlace.placeId,
+            selectionToken: confirmedPlace.selectionToken,
             codeIds: [...selectedCodeIds],
           }),
         }

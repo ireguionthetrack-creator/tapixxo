@@ -5,6 +5,7 @@ import {
 } from "@/lib/google-places";
 import { getCompanyGroupManagementAccess } from "@/lib/company-group-management";
 import { getGooglePlacesSearchRateLimit } from "@/lib/google-places-rate-limit";
+import { createGooglePlaceSelectionToken } from "@/lib/google-place-selection";
 
 type SearchBody = { query?: unknown };
 
@@ -50,7 +51,16 @@ export async function POST(
       userId: access.userId,
       queryLength: query.length,
     });
-    const places = await searchGooglePlaces(query);
+    const places = (await searchGooglePlaces(query)).map((place) => ({
+      ...place,
+      selectionToken: createGooglePlaceSelectionToken({
+        companyId,
+        userId: access.userId,
+        placeId: place.placeId,
+        businessName: place.businessName,
+        formattedAddress: place.formattedAddress,
+      }),
+    }));
     return NextResponse.json({ places });
   } catch (error) {
     if (error instanceof GooglePlacesError) {

@@ -2,15 +2,17 @@ import "server-only";
 
 const GOOGLE_PLACES_BASE_URL = "https://places.googleapis.com/v1";
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
-const DETAILS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_SEARCH_CACHE_ENTRIES = 100;
-const MAX_DETAILS_CACHE_ENTRIES = 200;
 
 type GooglePlacesApiPlace = {
   id?: unknown;
   displayName?: { text?: unknown };
   formattedAddress?: unknown;
-  googleMapsLinks?: { writeAReviewUri?: unknown };
+  googleMapsLinks?: {
+    writeAReviewUri?: unknown;
+    placeUri?: unknown;
+    reviewsUri?: unknown;
+  };
 };
 
 type GooglePlacesApiResponse = { places?: GooglePlacesApiPlace[] };
@@ -21,17 +23,17 @@ export type GooglePlaceSearchResult = {
   formattedAddress: string | null;
 };
 
-export type GoogleReviewPlace = GooglePlaceSearchResult & {
-  reviewUrl: string;
-  googleMapsWriteAReviewUri: string | null;
+export type GoogleReviewLinks = {
+  writeAReviewUri: string;
+  placeUri: string | null;
+  reviewsUri: string | null;
 };
 
 type CachedValue<T> = { expiresAt: number; value: T };
 
 const searchCache = new Map<string, CachedValue<GooglePlaceSearchResult[]>>();
-const detailsCache = new Map<string, CachedValue<GoogleReviewPlace>>();
 const pendingSearches = new Map<string, Promise<GooglePlaceSearchResult[]>>();
-const pendingDetails = new Map<string, Promise<GoogleReviewPlace>>();
+const pendingDetails = new Map<string, Promise<GoogleReviewLinks>>();
 
 export class GooglePlacesError extends Error {
   constructor(
@@ -74,14 +76,6 @@ export function isOfficialGoogleReviewUrl(value: string) {
 }
 
 const GOOGLE_PLACE_ID_PATTERN = /^[A-Za-z0-9_-]{10,255}$/;
-
-/** Construye el destino navegador-first solo para Place IDs con formato seguro. */
-export function buildGoogleWriteReviewUrl(placeId: string) {
-  const normalizedPlaceId = placeId.trim();
-  if (!GOOGLE_PLACE_ID_PATTERN.test(normalizedPlaceId)) return null;
-
-  return `https://search.google.com/local/writereview?placeid=${encodeURIComponent(normalizedPlaceId)}`;
-}
 
 function toSearchResult(place: GooglePlacesApiPlace): GooglePlaceSearchResult | null {
   const placeId = asText(place.id, 255);
@@ -160,13 +154,12 @@ const SEARCH_FIELD_MASK = [
   "places.formattedAddress",
 ].join(",");
 
-// writeAReviewUri se conserva solamente como fallback. La URL principal se
-// construye con el Place ID para abrir el formulario en navegador.
+// Solo se solicitan los enlaces que se guardan. No se pide ningún dato de
+// negocio adicional durante la confirmación.
 const DETAILS_FIELD_MASK = [
-  "id",
-  "displayName.text",
-  "formattedAddress",
   "googleMapsLinks.writeAReviewUri",
+  "googleMapsLinks.reviewsUri",
+  "googleMapsLinks.placeUri",
 ].join(",");
 
 export async function searchGooglePlaces(query: string) {
@@ -214,14 +207,13 @@ export async function searchGooglePlaces(query: string) {
   }
 }
 
-export async function getGoogleReviewPlace(placeId: string) {
-  const cached = getCachedValue(detailsCache, placeId);
-  if (cached) {
-    console.info("Google Places details cache hit");
-    return cached;
+export async function getGoogleReviewLinks(placeId: string) {
+  const normalizedPlaceId = placeId.trim();
+  if (!GOOGLE_PLACE_ID_PATTERN.test(normalizedPlaceId)) {
+    throw new GooglePlacesError("El identificador de Google no es válido.", "upstream");
   }
 
-  const pending = pendingDetails.get(placeId);
+  const pending = pendingDetails.get(normalizedPlaceId);
   if (pending) {
     console.info("Google Places details request coalesced");
     return pending;
@@ -230,44 +222,48 @@ export async function getGoogleReviewPlace(placeId: string) {
   const details = (async () => {
     const response = (await requestGooglePlaces(
       "place_details",
-      `${GOOGLE_PLACES_BASE_URL}/places/${encodeURIComponent(placeId)}`,
+      `${GOOGLE_PLACES_BASE_URL}/places/${encodeURIComponent(normalizedPlaceId)}`,
       { method: "GET" },
       DETAILS_FIELD_MASK
     )) as GooglePlacesApiPlace;
-    const place = toSearchResult(response);
     const writeAReviewUri = asText(
       response.googleMapsLinks?.writeAReviewUri,
       2000
     );
+    const placeUri = asText(response.googleMapsLinks?.placeUri, 2000);
+    const reviewsUri = asText(response.googleMapsLinks?.reviewsUri, 2000);
 
-    const reviewUrl = buildGoogleWriteReviewUrl(placeId);
-    if (!place || place.placeId !== placeId || !reviewUrl) {
+    if (!writeAReviewUri || !isOfficialGoogleReviewUrl(writeAReviewUri)) {
       throw new GooglePlacesError(
-        "Google no devolvió la información necesaria del negocio.",
+        "Google no devolvió un enlace oficial para escribir una reseña.",
         "upstream"
       );
     }
 
-    if (writeAReviewUri && !isOfficialGoogleReviewUrl(writeAReviewUri)) {
-      console.error("Google Places returned an unexpected review URL host");
+    const result = {
+      writeAReviewUri,
+      placeUri:
+        placeUri && isOfficialGoogleReviewUrl(placeUri) ? placeUri : null,
+      reviewsUri:
+        reviewsUri && isOfficialGoogleReviewUrl(reviewsUri) ? reviewsUri : null,
+    } satisfies GoogleReviewLinks;
+
+    if (process.env.NODE_ENV === "development") {
+      console.info("Google Places review links received", {
+        placeId,
+        writeAReviewUri: result.writeAReviewUri,
+        reviewsUri: result.reviewsUri,
+        placeUri: result.placeUri,
+      });
     }
 
-    const result = {
-      ...place,
-      reviewUrl,
-      googleMapsWriteAReviewUri:
-        writeAReviewUri && isOfficialGoogleReviewUrl(writeAReviewUri)
-          ? writeAReviewUri
-          : null,
-    } satisfies GoogleReviewPlace;
-    cacheValue(detailsCache, placeId, result, DETAILS_CACHE_TTL_MS, MAX_DETAILS_CACHE_ENTRIES);
     return result;
   })();
 
-  pendingDetails.set(placeId, details);
+  pendingDetails.set(normalizedPlaceId, details);
   try {
     return await details;
   } finally {
-    pendingDetails.delete(placeId);
+    pendingDetails.delete(normalizedPlaceId);
   }
 }
