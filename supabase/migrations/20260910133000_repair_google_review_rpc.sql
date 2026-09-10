@@ -1,7 +1,7 @@
 begin;
 
--- review_url is the canonical destination generated from the saved Place ID.
--- Existing writeAReviewUri data remains secondary compatibility data.
+-- Repair migration for installations where review_url was added but the
+-- PostgREST RPC signature was not created or refreshed.
 alter table public.company_google_review_destinations
   add column if not exists review_url text;
 
@@ -18,30 +18,18 @@ alter table public.company_google_review_destinations
     )
   );
 
-update public.codes as code
-set destination_url =
-  'https://search.google.com/local/writereview?placeid=' || destination.google_place_id
-from public.company_google_review_destinations as destination
-where code.destination_url = coalesce(destination.review_url, destination.write_a_review_uri)
-  and destination.google_place_id ~ '^[A-Za-z0-9_-]{10,255}$';
-
-update public.company_google_review_destinations as destination
+update public.company_google_review_destinations
 set
   review_url =
-    'https://search.google.com/local/writereview?placeid=' || destination.google_place_id,
+    'https://search.google.com/local/writereview?placeid=' || google_place_id,
   updated_at = now()
-where destination.google_place_id ~ '^[A-Za-z0-9_-]{10,255}$';
+where google_place_id ~ '^[A-Za-z0-9_-]{10,255}$'
+  and review_url is null;
 
--- The earlier controlled Google Search experiment used T1000. Once its
--- company has a configured Place ID, return that one plate to the approved
--- canonical review_url as well.
 update public.codes as code
 set destination_url = destination.review_url
-from public.code_groups as code_group
-inner join public.company_google_review_destinations as destination
-  on destination.company_id = code_group.company_id
-where code.group_id = code_group.id
-  and code.code = 'T1000'
+from public.company_google_review_destinations as destination
+where code.destination_url = destination.write_a_review_uri
   and destination.review_url is not null;
 
 create or replace function public.apply_company_google_review_destination(
@@ -82,8 +70,6 @@ begin
     raise exception 'invalid Google address';
   end if;
 
-  -- p_write_a_review_uri remains in the signature for backwards compatibility,
-  -- but is deliberately ignored. The destination is always derived server-side.
   v_review_url :=
     'https://search.google.com/local/writereview?placeid=' || v_place_id;
 
@@ -133,21 +119,6 @@ begin
         then current_destination.write_a_review_uri
       else excluded.write_a_review_uri
     end,
-    google_maps_write_a_review_uri = case
-      when current_destination.google_place_id = excluded.google_place_id
-        then current_destination.google_maps_write_a_review_uri
-      else null
-    end,
-    google_maps_place_uri = case
-      when current_destination.google_place_id = excluded.google_place_id
-        then current_destination.google_maps_place_uri
-      else null
-    end,
-    google_maps_reviews_uri = case
-      when current_destination.google_place_id = excluded.google_place_id
-        then current_destination.google_maps_reviews_uri
-      else null
-    end,
     updated_at = excluded.updated_at;
 
   if coalesce(cardinality(p_code_ids), 0) > 0 then
@@ -163,8 +134,6 @@ begin
 end;
 $$;
 
--- Keep the newer overload compatible with a rolling deployment while enforcing
--- the same Place-ID-derived primary URL.
 create or replace function public.apply_company_google_review_destination(
   p_company_id uuid,
   p_google_place_id text,

@@ -14,6 +14,7 @@ import { CompanyAvatar } from "@/app/components/company-avatar";
 import { CompanyAvatarUpload } from "@/app/components/company-avatar-upload";
 import { LiquidLoader } from "@/app/components/liquid-loader";
 import { GoogleReviewsDestinationTool } from "@/app/components/google-reviews-destination-tool";
+import { CodeScheduleDestinationTool } from "@/app/components/code-schedule-destination-tool";
 
 type Company = {
   id: string;
@@ -64,6 +65,8 @@ export default function CompanyPage() {
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [codes, setCodes] = useState<Code[]>([]);
+  const [scheduledCodeIds, setScheduledCodeIds] = useState<Set<string>>(new Set());
+  const [scheduleEditorCodeId, setScheduleEditorCodeId] = useState<string | null>(null);
   const [newStoreCodeIds, setNewStoreCodeIds] = useState<string[]>([]);
 
   const [scanCounts, setScanCounts] =
@@ -388,6 +391,23 @@ export default function CompanyPage() {
     setScanCountsAvailable(true);
   }
 
+  async function loadScheduleAssignments() {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/schedules`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !Array.isArray(result.schedules)) {
+        setScheduledCodeIds(new Set());
+        return;
+      }
+      const ids = result.schedules.flatMap((schedule: { code_schedule_assignments?: Array<{ code_id?: string }> }) =>
+        (schedule.code_schedule_assignments ?? []).map((assignment) => assignment.code_id).filter((id): id is string => typeof id === "string")
+      );
+      setScheduledCodeIds(new Set(ids));
+    } catch {
+      setScheduledCodeIds(new Set());
+    }
+  }
+
   async function loadEditMode() {
     try {
       const response = await fetch(
@@ -491,6 +511,7 @@ export default function CompanyPage() {
       loadCompany(),
       loadGroups(),
       loadCodes(),
+      loadScheduleAssignments(),
       loadScanCounts(),
       loadEditMode(),
     ];
@@ -1145,6 +1166,12 @@ export default function CompanyPage() {
             codes={codes}
             onCodesUpdated={() => void loadCodes()}
           />
+          <CodeScheduleDestinationTool
+            companyId={companyId}
+            codes={codes}
+            selectedCodeId={scheduleEditorCodeId}
+            onScheduleChanged={() => void loadScheduleAssignments()}
+          />
         </div>
 
         {/* GRUPOS */}
@@ -1683,6 +1710,21 @@ export default function CompanyPage() {
                               <p className="mt-1 text-xs text-gray-500">
                                 /t/{code.code}
                               </p>
+
+                              {scheduledCodeIds.has(code.id) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setScheduleEditorCodeId(code.id)}
+                                  className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl border border-orange-300/35 bg-gradient-to-r from-orange-400/[0.15] to-white/[0.05] px-3 text-xs font-semibold text-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] transition hover:-translate-y-0.5 hover:border-orange-200/65 hover:from-orange-400/[0.24] hover:shadow-[0_10px_24px_rgba(249,115,22,0.16)]"
+                                  title="Editar o quitar programación por horario"
+                                >
+                                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-4 w-4">
+                                    <circle cx="12" cy="12" r="7.5" />
+                                    <path d="M12 8v4.5l3 1.8" />
+                                  </svg>
+                                  Horario activo
+                                </button>
+                              )}
 
                               <p className="mt-2 text-sm text-gray-400">
                                 {scanCountsAvailable

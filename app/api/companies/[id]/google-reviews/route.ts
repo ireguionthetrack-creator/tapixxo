@@ -49,6 +49,10 @@ export async function GET(
 
   if (error) {
     if (isMissingGoogleReviewTable(error)) {
+      console.error("Google Reviews schema or RPC is unavailable", {
+        code: error.code,
+        message: error.message,
+      });
       return NextResponse.json(
         { error: "Falta aplicar la migración de Google Reviews." },
         { status: 503 }
@@ -140,6 +144,10 @@ export async function PUT(
 
     if (error) {
       if (isMissingGoogleReviewTable(error)) {
+        console.error("Google Reviews schema or RPC is unavailable", {
+          code: error.code,
+          message: error.message,
+        });
         return NextResponse.json(
           { error: "Falta aplicar la migración de Google Reviews." },
           { status: 503 }
