@@ -451,6 +451,176 @@ select:focus {
   to { opacity: 0.46; background-position: 50% 100%; }
 }
 
+/* Home: superficie física, capas de vidrio y señal digital. */
+.tapixxo-home-hero {
+  min-height: min(49rem, calc(100vh - 4rem));
+}
+
+.tapixxo-hero-glow {
+  animation: tapixxo-hero-glow 9s ease-in-out infinite alternate;
+}
+
+.tapixxo-hero-word {
+  background: linear-gradient(120deg, #e7e7e7 10%, #ffbd82 46%, #8f8f8f 88%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tapixxo-hero-stage {
+  position: relative;
+  min-height: 23rem;
+  isolation: isolate;
+}
+
+.tapixxo-hero-orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: -1;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 191, 140, 0.18);
+  clip-path: polygon(50% 0%, 79% 9%, 98% 35%, 98% 65%, 79% 91%, 50% 100%, 21% 91%, 2% 65%, 2% 35%, 21% 9%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.tapixxo-hero-orbit-one {
+  width: min(88%, 23rem);
+  border-color: rgba(255, 163, 89, 0.56);
+  box-shadow: 0 0 34px rgba(255, 122, 26, 0.14);
+  animation: tapixxo-hero-orbit-clockwise 11s linear infinite;
+}
+
+.tapixxo-hero-orbit-two {
+  width: min(104%, 27rem);
+  opacity: 0.7;
+  animation: tapixxo-hero-orbit-counter 16s linear infinite;
+}
+
+.tapixxo-hero-orbit-three {
+  width: min(119%, 31rem);
+  border-color: rgba(255, 255, 255, 0.1);
+  opacity: 0.5;
+  animation: tapixxo-hero-orbit-clockwise 22s linear infinite reverse;
+}
+
+.tapixxo-hero-plate {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(66%, 17.5rem);
+  aspect-ratio: 0.8;
+  overflow: hidden;
+  border: 1px solid rgba(255, 222, 198, 0.28);
+  border-radius: 2.25rem;
+  transform: translate(-50%, -50%) rotate(-7deg);
+  background:
+    radial-gradient(circle at 77% 14%, rgba(255, 151, 75, 0.31), transparent 27%),
+    radial-gradient(circle at 18% 77%, rgba(255, 255, 255, 0.1), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.035) 34%, rgba(255, 122, 26, 0.13)),
+    rgba(20, 20, 19, 0.75);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.35),
+    inset 0 -1px rgba(255, 255, 255, 0.08),
+    0 32px 70px rgba(0, 0, 0, 0.42),
+    0 0 44px rgba(255, 122, 26, 0.12);
+  backdrop-filter: blur(24px) saturate(135%);
+  transition: transform 850ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 850ms ease;
+}
+
+.tapixxo-hero-plate-shine {
+  position: absolute;
+  inset: -55% -22%;
+  transform: translateX(-42%) rotate(24deg);
+  background: linear-gradient(90deg, transparent 36%, rgba(255, 255, 255, 0.23) 50%, transparent 64%);
+  animation: tapixxo-hero-sheen 7s ease-in-out infinite;
+}
+
+.tapixxo-nfc-mark {
+  position: relative;
+  display: grid;
+  width: 5.4rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(255, 229, 209, 0.3);
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 27%, rgba(255, 255, 255, 0.3), transparent 17%), rgba(255, 145, 63, 0.08);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.3), 0 0 26px rgba(255, 122, 26, 0.19);
+}
+
+.tapixxo-nfc-ring {
+  position: absolute;
+  inset: -0.48rem;
+  border: 1px solid rgba(255, 190, 141, 0.36);
+  border-radius: 50%;
+  animation: tapixxo-nfc-breathe 2.6s ease-in-out infinite;
+}
+
+.tapixxo-nfc-ring-two {
+  inset: -1.05rem;
+  opacity: 0.48;
+  animation-delay: -1.2s;
+}
+
+.tapixxo-hero-float-card {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.2), 0 15px 38px rgba(0, 0, 0, 0.28);
+  padding: 0.65rem 0.8rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.72rem;
+  font-weight: 500;
+  backdrop-filter: blur(18px) saturate(140%);
+  animation: tapixxo-hero-float 5s ease-in-out infinite;
+}
+
+.tapixxo-hero-float-top { top: 8%; right: 2%; }
+.tapixxo-hero-float-bottom { bottom: 8%; left: 1%; animation-delay: -2.4s; }
+
+@media (hover: hover) {
+  .tapixxo-hero-stage:hover .tapixxo-hero-plate {
+    transform: translate(-50%, -50%) rotate(-2deg) scale(1.035);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.38), inset 0 -1px rgba(255, 255, 255, 0.08), 0 42px 82px rgba(0, 0, 0, 0.45), 0 0 62px rgba(255, 122, 26, 0.2);
+  }
+}
+
+@keyframes tapixxo-hero-glow {
+  from { transform: translateX(-50%) scale(0.9); opacity: 0.6; }
+  to { transform: translateX(-50%) scale(1.16); opacity: 1; }
+}
+
+@keyframes tapixxo-hero-orbit-clockwise {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes tapixxo-hero-orbit-counter {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(-360deg); }
+}
+
+@keyframes tapixxo-hero-sheen {
+  0%, 22% { transform: translateX(-52%) rotate(24deg); opacity: 0; }
+  42% { opacity: 1; }
+  66%, 100% { transform: translateX(58%) rotate(24deg); opacity: 0; }
+}
+
+@keyframes tapixxo-nfc-breathe {
+  0%, 100% { transform: scale(0.9); opacity: 0.25; }
+  50% { transform: scale(1.08); opacity: 0.78; }
+}
+
+@keyframes tapixxo-hero-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.5rem); }
+}
+
 @media (max-width: 640px) {
   .tapixxo-grid { background-size: 36px 36px; }
   .tapixxo-shell::before,
@@ -458,6 +628,13 @@ select:focus {
   .tapixxo-panel,
   .tapixxo-glass-card { border-radius: 1.25rem; }
   .tapixxo-display { letter-spacing: -0.055em; }
+  .tapixxo-home-hero { min-height: 0; }
+  .tapixxo-hero-stage { min-height: 20rem; max-width: 23rem; }
+  .tapixxo-hero-orbit-three { display: none; }
+  .tapixxo-hero-plate { width: min(64%, 15rem); border-radius: 1.85rem; }
+  .tapixxo-hero-float-card { padding: 0.55rem 0.65rem; font-size: 0.64rem; }
+  .tapixxo-hero-float-top { right: 0; }
+  .tapixxo-hero-float-bottom { left: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

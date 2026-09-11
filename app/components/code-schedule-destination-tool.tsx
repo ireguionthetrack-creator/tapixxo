@@ -81,11 +81,13 @@ export function CodeScheduleDestinationTool({
   codes,
   selectedCodeId,
   onScheduleChanged,
+  onOpenChange,
 }: {
   companyId: string;
   codes: CompanyCode[];
   selectedCodeId?: string | null;
   onScheduleChanged?: () => void;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const orderedCodes = useMemo(
     () => [...codes].sort((a, b) => codeNumberOrder.compare(a.code, b.code)),
@@ -95,7 +97,6 @@ export function CodeScheduleDestinationTool({
   const [codeId, setCodeId] = useState("");
   const [selectedCodeIds, setSelectedCodeIds] = useState<Set<string>>(new Set());
   const [platesExpanded, setPlatesExpanded] = useState(false);
-  const [scheduleName, setScheduleName] = useState("");
   const [applyToFuturePlates, setApplyToFuturePlates] = useState(false);
   const [replaceConflicts, setReplaceConflicts] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -120,9 +121,10 @@ export function CodeScheduleDestinationTool({
       setCodeId(selectedCodeId);
       setSelectedCodeIds(new Set([selectedCodeId]));
       setOpen(true);
+      onOpenChange?.(true);
     }, 0);
     return () => window.clearTimeout(openTimer);
-  }, [selectedCodeId]);
+  }, [onOpenChange, selectedCodeId]);
 
   const preview = useMemo(() => {
     const clock = getLocalClock(timeZone);
@@ -216,7 +218,7 @@ export function CodeScheduleDestinationTool({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           scheduleId: sharedScheduleId,
-          name: scheduleName,
+          name: null,
           enabled,
           scheduleKind: kind,
           scheduleDate: kind === "date" ? date : null,
@@ -260,8 +262,8 @@ export function CodeScheduleDestinationTool({
   }
 
   return (
-    <section className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-2 mt-5 overflow-hidden rounded-3xl border border-white/[0.12] shadow-[0_24px_70px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.2)]">
-      <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
+    <section className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-2 h-full min-w-0 overflow-hidden rounded-2xl border border-white/[0.12] shadow-[0_24px_70px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.2)] sm:rounded-3xl">
+      <button type="button" onClick={() => setOpen((value) => { const nextOpen = !value; onOpenChange?.(nextOpen); return nextOpen; })} aria-expanded={open}
         className="group flex min-h-24 w-full items-center gap-3 px-4 py-4 text-left transition duration-500 hover:bg-white/[0.055] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300/70 sm:min-h-28 sm:gap-4 sm:px-6">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-orange-200/25 bg-gradient-to-br from-orange-200/[0.23] via-orange-400/[0.13] to-white/[0.05] text-orange-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.32),0_12px_26px_rgba(0,0,0,0.2)] backdrop-blur-xl transition duration-500 group-hover:scale-105 group-hover:border-orange-200/50 group-hover:shadow-[0_14px_32px_rgba(249,115,22,0.18)]">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6"><circle cx="12" cy="12" r="7.5"/><path d="M12 8v4.5l3 1.8"/><path d="M5 3.8 3.5 5.3M19 3.8l1.5 1.5"/></svg>
@@ -284,7 +286,6 @@ export function CodeScheduleDestinationTool({
           </label>
           {!codeId ? <p className="mt-4 rounded-2xl border border-dashed border-white/[0.15] bg-black/15 p-4 text-sm text-gray-400">Elige una placa para crear una programación reutilizable.</p> : loading ? <div className="mt-5 h-28 animate-pulse rounded-2xl border border-white/[0.07] bg-white/[0.04]" /> : (
             <div className="mt-5 space-y-5">
-              <label className="block text-sm text-gray-300">Nombre opcional<input value={scheduleName} onChange={(event) => setScheduleName(event.target.value)} placeholder="Horario principal" className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white" /></label>
               <label className="flex min-h-11 items-center gap-3 rounded-xl border border-white/[0.1] bg-black/20 px-4 text-sm text-gray-200"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} className="h-4 w-4 accent-orange-400" /> Activar programación</label>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="text-sm text-gray-300">Repetición<select value={kind} onChange={(event) => setKind(event.target.value as "daily" | "date")} className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="daily">Todos los días</option><option value="date">Solo una fecha</option></select></label>
@@ -295,7 +296,6 @@ export function CodeScheduleDestinationTool({
                 <div className="mt-3 space-y-3">{rules.map((rule, index) => <div key={index} className="rounded-xl border border-white/[0.1] bg-black/20 p-3"><div className="grid gap-3 sm:grid-cols-4"><input aria-label="Hora inicial" type="time" value={rule.startTime} onChange={(event) => updateRule(index, { startTime: event.target.value })} className="min-h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white" /><input aria-label="Hora final" type="time" value={rule.endTime} onChange={(event) => updateRule(index, { endTime: event.target.value })} className="min-h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white" /><select value={rule.destinationType} onChange={(event) => updateRule(index, { destinationType: event.target.value as RuleForm["destinationType"] })} className="min-h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="primary">Destino principal</option><option value="google_reviews" disabled={!googleReviewUrl}>Google Reviews</option><option value="whatsapp">WhatsApp</option><option value="custom">URL personalizada</option></select>{rule.destinationType === "whatsapp" || rule.destinationType === "custom" ? <input type="url" placeholder="https://…" value={rule.destinationUrl} onChange={(event) => updateRule(index, { destinationUrl: event.target.value })} className="min-h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white" /> : <p className="self-center text-xs text-gray-500">{rule.destinationType === "primary" ? (primaryDestinationUrl ? "Usa el destino actual" : "Configura primero el destino") : "Usa Google Reviews conectado"}</p>}</div>{rules.length > 1 && <button type="button" onClick={() => setRules((current) => current.filter((_, ruleIndex) => ruleIndex !== index))} className="mt-3 text-xs text-red-300 hover:text-red-200">Quitar franja</button>}</div>)}</div>
                 <button type="button" disabled={rules.length >= 24} onClick={() => setRules((current) => [...current, initialRule()])} className="mt-3 min-h-10 rounded-xl border border-orange-300/30 px-4 text-sm font-semibold text-orange-100 transition hover:bg-orange-300/10 disabled:opacity-50">Añadir franja</button>
               </div>
-              <p className="rounded-xl border border-emerald-300/20 bg-emerald-400/[0.06] p-3 text-sm leading-6 text-emerald-100"><span className="font-semibold">Fuera de horario: </span>la placa vuelve automáticamente a su enlace original.</p>
               <div className="overflow-hidden rounded-2xl border border-white/[0.12] bg-gradient-to-br from-white/[0.06] via-black/20 to-orange-400/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
                 <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5"><div><p className="font-semibold text-white">¿A qué placas quieres aplicarlo?</p><p className="mt-1 text-sm text-gray-400"><span className="font-medium text-orange-100">{selectedCodeIds.size}</span> placa{selectedCodeIds.size === 1 ? "" : "s"} seleccionada{selectedCodeIds.size === 1 ? "" : "s"}.</p></div><div className="flex w-full flex-wrap gap-2 sm:w-auto"><button type="button" onClick={() => setSelectedCodeIds(new Set(orderedCodes.map((code) => code.id)))} className="min-h-10 flex-1 rounded-xl border border-orange-300/30 bg-orange-400/[0.08] px-3 text-xs font-semibold text-orange-100 transition hover:bg-orange-400/[0.16] sm:flex-none">Seleccionar todas</button><button type="button" onClick={() => setSelectedCodeIds(new Set())} className="min-h-10 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-gray-300 transition hover:bg-white/[0.08] sm:flex-none">Quitar selección</button><button type="button" onClick={() => setPlatesExpanded((value) => !value)} aria-expanded={platesExpanded} className="min-h-10 w-full rounded-xl border border-white/[0.14] bg-white/[0.06] px-3 text-xs font-semibold text-white transition hover:border-orange-300/40 hover:bg-orange-400/[0.1] sm:w-auto">{platesExpanded ? "Ocultar placas" : `Ver placas (${orderedCodes.length})`}</button></div></div>
                 <div className={`grid transition-[grid-template-rows,opacity] duration-500 ease-out ${platesExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}><div className="overflow-hidden"><div className="border-t border-white/[0.08] bg-black/[0.12] p-3 sm:p-4"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{orderedCodes.map((code) => <label key={code.id} className={`flex min-h-12 items-center gap-3 rounded-xl border px-3 text-sm transition ${selectedCodeIds.has(code.id) ? "border-orange-300/45 bg-orange-400/[0.11] text-white" : "border-white/[0.08] bg-black/20 text-gray-300 hover:border-white/20 hover:bg-white/[0.04]"}`}><input type="checkbox" checked={selectedCodeIds.has(code.id)} onChange={() => toggleCodeSelection(code.id)} className="h-4 w-4 accent-orange-400" /><span className="font-mono font-semibold">{code.code}</span></label>)}</div></div></div></div>

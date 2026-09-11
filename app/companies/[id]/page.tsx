@@ -2,6 +2,7 @@
 
 import {
   FormEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -67,6 +68,15 @@ export default function CompanyPage() {
   const [codes, setCodes] = useState<Code[]>([]);
   const [scheduledCodeIds, setScheduledCodeIds] = useState<Set<string>>(new Set());
   const [scheduleEditorCodeId, setScheduleEditorCodeId] = useState<string | null>(null);
+  const [activeDestinationTool, setActiveDestinationTool] = useState<"google" | "schedule" | null>(null);
+  const handleGoogleDestinationOpen = useCallback(
+    (open: boolean) => setActiveDestinationTool(open ? "google" : null),
+    []
+  );
+  const handleScheduleDestinationOpen = useCallback(
+    (open: boolean) => setActiveDestinationTool(open ? "schedule" : null),
+    []
+  );
   const [newStoreCodeIds, setNewStoreCodeIds] = useState<string[]>([]);
 
   const [scanCounts, setScanCounts] =
@@ -1121,34 +1131,34 @@ export default function CompanyPage() {
 
         {/* ESTADÍSTICAS */}
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
 
-          <div className="tapixxo-panel tapixxo-enter rounded-2xl p-5 sm:p-6">
-            <p className="text-xs font-medium uppercase tracking-[0.15em] text-gray-500">
+          <div className="tapixxo-panel tapixxo-enter rounded-xl p-3 sm:rounded-2xl sm:p-4">
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-gray-500 sm:text-xs sm:tracking-[0.15em]">
               Grupos
             </p>
 
-            <p className="mt-3 text-3xl font-semibold tracking-tight">
+            <p className="mt-1.5 text-2xl font-semibold tracking-tight sm:mt-2 sm:text-3xl">
               {groups.length}
             </p>
           </div>
 
-          <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-1 rounded-2xl p-5 sm:p-6">
-            <p className="text-xs font-medium uppercase tracking-[0.15em] text-gray-500">
+          <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-1 rounded-xl p-3 sm:rounded-2xl sm:p-4">
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-gray-500 sm:text-xs sm:tracking-[0.15em]">
               Códigos
             </p>
 
-            <p className="mt-3 text-3xl font-semibold tracking-tight">
+            <p className="mt-1.5 text-2xl font-semibold tracking-tight sm:mt-2 sm:text-3xl">
               {codes.length}
             </p>
           </div>
 
-          <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-2 rounded-2xl p-5 sm:p-6">
-            <p className="text-xs font-medium uppercase tracking-[0.15em] text-gray-500">
+          <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-2 rounded-xl p-3 sm:rounded-2xl sm:p-4">
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-gray-500 sm:text-xs sm:tracking-[0.15em]">
               Visitas
             </p>
 
-            <p className="mt-3 text-3xl font-semibold tracking-tight">
+            <p className="mt-1.5 text-2xl font-semibold tracking-tight sm:mt-2 sm:text-3xl">
               {scanCountsAvailable
                 ? Object.values(scanCounts).reduce(
                     (total, count) => total + count,
@@ -1160,18 +1170,36 @@ export default function CompanyPage() {
 
         </div>
 
-        <div className="mt-8">
-          <GoogleReviewsDestinationTool
-            companyId={companyId}
-            codes={codes}
-            onCodesUpdated={() => void loadCodes()}
-          />
-          <CodeScheduleDestinationTool
-            companyId={companyId}
-            codes={codes}
-            selectedCodeId={scheduleEditorCodeId}
-            onScheduleChanged={() => void loadScheduleAssignments()}
-          />
+        <div className="mt-8 grid min-w-0 items-start gap-4 sm:gap-5 lg:grid-cols-2 lg:gap-6">
+          <div className={`min-w-0 origin-top will-change-transform transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            activeDestinationTool === "schedule"
+              ? "pointer-events-none max-h-0 -translate-y-3 scale-[0.985] overflow-hidden opacity-0 lg:col-span-2"
+              : activeDestinationTool === "google"
+                ? "max-h-[10000px] opacity-100 lg:col-span-2"
+                : "max-h-[10000px] opacity-100 lg:col-span-1"
+          }`}>
+            <GoogleReviewsDestinationTool
+              companyId={companyId}
+              codes={codes}
+              onCodesUpdated={() => void loadCodes()}
+              onOpenChange={handleGoogleDestinationOpen}
+            />
+          </div>
+          <div className={`min-w-0 origin-top will-change-transform transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            activeDestinationTool === "google"
+              ? "pointer-events-none max-h-0 -translate-y-3 scale-[0.985] overflow-hidden opacity-0 lg:col-span-2"
+              : activeDestinationTool === "schedule"
+                ? "max-h-[10000px] opacity-100 lg:col-span-2"
+                : "max-h-[10000px] opacity-100 lg:col-span-1"
+          }`}>
+            <CodeScheduleDestinationTool
+              companyId={companyId}
+              codes={codes}
+              selectedCodeId={scheduleEditorCodeId}
+              onScheduleChanged={() => void loadScheduleAssignments()}
+              onOpenChange={handleScheduleDestinationOpen}
+            />
+          </div>
         </div>
 
         {/* GRUPOS */}
