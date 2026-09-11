@@ -129,7 +129,7 @@ returns table(code_id uuid,code text,destination_url text,active boolean,company
 language plpgsql security definer set search_path=public as $$
 declare c public.codes%rowtype; v_company uuid; tz text; s public.code_schedules%rowtype; r public.code_schedule_rules%rowtype; local_ts timestamp; d date; t time;
 begin
- select * into c from public.codes where codes.code=p_code and active; if not found then return; end if;
+ select * into c from public.codes where codes.code=p_code and codes.active=true; if not found then return; end if;
  v_company:=c.company_id; if v_company is null then select company_id into v_company from public.code_groups where id=c.group_id; end if;
  select cs.* into s from public.code_schedule_assignments a join public.code_schedules cs on cs.id=a.schedule_id where a.code_id=c.id and cs.enabled;
  select time_zone into tz from public.companies where id=v_company;

@@ -106,8 +106,7 @@ export function CodeScheduleDestinationTool({
   const [kind, setKind] = useState<"daily" | "date">("daily");
   const [date, setDate] = useState("");
   const [timeZone, setTimeZone] = useState("America/Bogota");
-  const [after, setAfter] = useState<"keep_last" | "default_destination" | "custom_destination">("keep_last");
-  const [afterUrl, setAfterUrl] = useState("");
+  const [after, setAfter] = useState<"keep_last" | "default_destination" | "custom_destination">("default_destination");
   const [rules, setRules] = useState<RuleForm[]>([initialRule()]);
   const [sharedScheduleId, setSharedScheduleId] = useState<string | null>(null);
   const [canDetach, setCanDetach] = useState(false);
@@ -168,16 +167,14 @@ export function CodeScheduleDestinationTool({
           setEnabled(true);
           setKind("daily");
           setDate("");
-          setAfter("keep_last");
-          setAfterUrl("");
+          setAfter("default_destination");
           setRules([initialRule()]);
           return;
         }
         setEnabled(schedule.enabled);
         setKind(schedule.schedule_kind);
         setDate(schedule.schedule_date ?? "");
-        setAfter(schedule.after_behavior);
-        setAfterUrl(schedule.after_custom_destination_url ?? "");
+        setAfter("default_destination");
         setRules(
           [...(schedule.code_schedule_rules ?? [])]
             .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""))
@@ -223,8 +220,8 @@ export function CodeScheduleDestinationTool({
           enabled,
           scheduleKind: kind,
           scheduleDate: kind === "date" ? date : null,
-          afterBehavior: after,
-          afterCustomDestinationUrl: after === "custom_destination" ? afterUrl : null,
+          afterBehavior: "default_destination",
+          afterCustomDestinationUrl: null,
           timeZone, applyToFuturePlates, replaceConflicts,
           codeIds: [...selectedCodeIds],
           rules,
@@ -298,8 +295,7 @@ export function CodeScheduleDestinationTool({
                 <div className="mt-3 space-y-3">{rules.map((rule, index) => <div key={index} className="rounded-xl border border-white/[0.1] bg-black/20 p-3"><div className="grid gap-3 sm:grid-cols-4"><input aria-label="Hora inicial" type="time" value={rule.startTime} onChange={(event) => updateRule(index, { startTime: event.target.value })} className="min-h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white" /><input aria-label="Hora final" type="time" value={rule.endTime} onChange={(event) => updateRule(index, { endTime: event.target.value })} className="min-h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white" /><select value={rule.destinationType} onChange={(event) => updateRule(index, { destinationType: event.target.value as RuleForm["destinationType"] })} className="min-h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="primary">Destino principal</option><option value="google_reviews" disabled={!googleReviewUrl}>Google Reviews</option><option value="whatsapp">WhatsApp</option><option value="custom">URL personalizada</option></select>{rule.destinationType === "whatsapp" || rule.destinationType === "custom" ? <input type="url" placeholder="https://…" value={rule.destinationUrl} onChange={(event) => updateRule(index, { destinationUrl: event.target.value })} className="min-h-11 rounded-xl border border-white/10 bg-black/30 px-3 text-white" /> : <p className="self-center text-xs text-gray-500">{rule.destinationType === "primary" ? (primaryDestinationUrl ? "Usa el destino actual" : "Configura primero el destino") : "Usa Google Reviews conectado"}</p>}</div>{rules.length > 1 && <button type="button" onClick={() => setRules((current) => current.filter((_, ruleIndex) => ruleIndex !== index))} className="mt-3 text-xs text-red-300 hover:text-red-200">Quitar franja</button>}</div>)}</div>
                 <button type="button" disabled={rules.length >= 24} onClick={() => setRules((current) => [...current, initialRule()])} className="mt-3 min-h-10 rounded-xl border border-orange-300/30 px-4 text-sm font-semibold text-orange-100 transition hover:bg-orange-300/10 disabled:opacity-50">Añadir franja</button>
               </div>
-              <label className="block text-sm text-gray-300">Después de los horarios<select value={after} onChange={(event) => setAfter(event.target.value as typeof after)} className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white"><option value="keep_last">Mantener último destino</option><option value="default_destination">Usar destino principal</option><option value="custom_destination">Usar URL personalizada</option></select></label>
-              {after === "custom_destination" && <input type="url" placeholder="https://…" value={afterUrl} onChange={(event) => setAfterUrl(event.target.value)} className="min-h-11 w-full rounded-xl border border-white/10 bg-black/30 px-3 text-white" />}
+              <p className="rounded-xl border border-emerald-300/20 bg-emerald-400/[0.06] p-3 text-sm leading-6 text-emerald-100"><span className="font-semibold">Fuera de horario: </span>la placa vuelve automáticamente a su enlace original.</p>
               <div className="overflow-hidden rounded-2xl border border-white/[0.12] bg-gradient-to-br from-white/[0.06] via-black/20 to-orange-400/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
                 <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5"><div><p className="font-semibold text-white">¿A qué placas quieres aplicarlo?</p><p className="mt-1 text-sm text-gray-400"><span className="font-medium text-orange-100">{selectedCodeIds.size}</span> placa{selectedCodeIds.size === 1 ? "" : "s"} seleccionada{selectedCodeIds.size === 1 ? "" : "s"}.</p></div><div className="flex w-full flex-wrap gap-2 sm:w-auto"><button type="button" onClick={() => setSelectedCodeIds(new Set(orderedCodes.map((code) => code.id)))} className="min-h-10 flex-1 rounded-xl border border-orange-300/30 bg-orange-400/[0.08] px-3 text-xs font-semibold text-orange-100 transition hover:bg-orange-400/[0.16] sm:flex-none">Seleccionar todas</button><button type="button" onClick={() => setSelectedCodeIds(new Set())} className="min-h-10 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-gray-300 transition hover:bg-white/[0.08] sm:flex-none">Quitar selección</button><button type="button" onClick={() => setPlatesExpanded((value) => !value)} aria-expanded={platesExpanded} className="min-h-10 w-full rounded-xl border border-white/[0.14] bg-white/[0.06] px-3 text-xs font-semibold text-white transition hover:border-orange-300/40 hover:bg-orange-400/[0.1] sm:w-auto">{platesExpanded ? "Ocultar placas" : `Ver placas (${orderedCodes.length})`}</button></div></div>
                 <div className={`grid transition-[grid-template-rows,opacity] duration-500 ease-out ${platesExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}><div className="overflow-hidden"><div className="border-t border-white/[0.08] bg-black/[0.12] p-3 sm:p-4"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{orderedCodes.map((code) => <label key={code.id} className={`flex min-h-12 items-center gap-3 rounded-xl border px-3 text-sm transition ${selectedCodeIds.has(code.id) ? "border-orange-300/45 bg-orange-400/[0.11] text-white" : "border-white/[0.08] bg-black/20 text-gray-300 hover:border-white/20 hover:bg-white/[0.04]"}`}><input type="checkbox" checked={selectedCodeIds.has(code.id)} onChange={() => toggleCodeSelection(code.id)} className="h-4 w-4 accent-orange-400" /><span className="font-mono font-semibold">{code.code}</span></label>)}</div></div></div></div>

@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     p_name: typeof body.name === "string" ? body.name.slice(0, 120) : null,
     p_enabled: body.enabled === true, p_schedule_kind: body.scheduleKind,
     p_schedule_date: body.scheduleKind === "date" && typeof body.scheduleDate === "string" ? body.scheduleDate : null,
-    p_after_behavior: body.afterBehavior, p_after_custom_destination_url: body.afterBehavior === "custom_destination" ? body.afterCustomDestinationUrl : null,
+    p_after_behavior: "default_destination", p_after_custom_destination_url: null,
     p_time_zone: body.timeZone, p_apply_to_future_plates: body.applyToFuturePlates === true,
     p_code_ids: ids, p_replace_conflicts: body.replaceConflicts === true, p_rules: body.rules,
   }).maybeSingle();
