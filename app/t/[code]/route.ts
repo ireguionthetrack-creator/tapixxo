@@ -62,12 +62,15 @@ export async function GET(
   try {
     const admin = createAdminClient();
     const { data, error } = await admin
-      .rpc("resolve_public_code_destination", { p_code: code })
+      .rpc("resolve_public_code_destination", {
+        p_code: code,
+        p_scanned_at: new Date().toISOString(),
+      })
       .maybeSingle();
     if (!error && data) {
       resolved = data as ResolvedCodeDestination;
       scanWithAdmin = true;
-    } else if (error && error.code !== "PGRST202") {
+    } else if (error) {
       console.error("Scheduled destination resolution failed", {
         code: error.code,
         message: error.message,

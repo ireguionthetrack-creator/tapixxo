@@ -9,11 +9,14 @@ import { RedirectingCodeContent } from "./redirecting-code-content";
 export const dynamic = "force-dynamic";
 
 type RedirectableCode = {
-  id: string;
+  code_id: string;
   code: string;
   destination_url: string | null;
   company_id: string | null;
   group_id: string | null;
+  schedule_id: string | null;
+  schedule_rule_id: string | null;
+  destination_source: string | null;
 };
 
 type CompanyIdentity = {
@@ -43,13 +46,19 @@ export default async function RedirectingCodePage({
   const { code: requestedCode } = await params;
   const [userId, admin] = [await getSignedInUserId(), createAdminClient()];
   const { data, error } = await admin
-    .from("codes")
-    .select("id, code, destination_url, company_id, group_id")
-    .eq("code", requestedCode)
-    .eq("active", true)
+    .rpc("resolve_public_code_destination", {
+      p_code: requestedCode,
+      p_scanned_at: new Date().toISOString(),
+    })
     .maybeSingle();
 
   const code = data as RedirectableCode | null;
+  if (error) {
+    console.error("Scheduled destination resolution failed in edit mode", {
+      code: error.code,
+      message: error.message,
+    });
+  }
   if (error || !code || !code.destination_url) {
     redirect(`/t/${encodeURIComponent(requestedCode)}`);
   }
@@ -73,7 +82,13 @@ export default async function RedirectingCodePage({
     redirect(`/t/${encodeURIComponent(code.code)}`);
   }
 
-  await admin.from("code_scans").insert({ code_id: code.id });
+  await admin.from("code_scans").insert({
+    code_id: code.code_id,
+    schedule_id: code.schedule_id,
+    schedule_rule_id: code.schedule_rule_id,
+    resolved_destination_url: code.destination_url,
+    destination_source: code.destination_source ?? "primary",
+  });
 
   const { data: company } = await admin
     .from("companies")
@@ -85,7 +100,7 @@ export default async function RedirectingCodePage({
     <RedirectingCodeContent
       code={code.code}
       company={company as CompanyIdentity | null}
-      configureUrl={`/companies/${access.companyId}?editCode=${encodeURIComponent(code.id)}`}
+      configureUrl={`/companies/${access.companyId}?editCode=${encodeURIComponent(code.code_id)}`}
     />
   );
 }
