@@ -316,7 +316,7 @@ export function GoogleReviewsDestinationTool({
     orderedCodes.length > 0 && selectedCodeIds.size === orderedCodes.length;
 
   return (
-    <section className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-1 h-full min-w-0 overflow-hidden rounded-2xl sm:rounded-3xl">
+    <section data-open={isOpen} className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-1 tapixxo-mobile-destination-card relative isolate h-full min-w-0 overflow-hidden rounded-2xl sm:rounded-3xl">
       <button
         type="button"
         aria-expanded={isOpen}
@@ -326,13 +326,15 @@ export function GoogleReviewsDestinationTool({
           onOpenChange?.(nextOpen);
           return nextOpen;
         })}
-        className="group flex min-h-24 w-full items-center gap-3 px-4 py-4 text-left transition duration-300 hover:bg-white/[0.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300/70 sm:min-h-28 sm:gap-4 sm:px-6"
+        className={`group flex min-h-24 w-full items-center gap-3 px-4 py-4 text-left transition duration-300 hover:bg-white/[0.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300/70 sm:min-h-28 sm:gap-4 sm:px-6 ${
+          isOpen ? "" : "max-sm:min-h-36 max-sm:flex-col max-sm:items-center max-sm:justify-center max-sm:gap-2 max-sm:px-3 max-sm:text-center"
+        }`}
       >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.1] shadow-[inset_0_1px_1px_rgba(255,255,255,0.23),0_10px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl transition duration-300 group-hover:border-white/25 group-hover:bg-white/[0.15]">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.1] shadow-[inset_0_1px_1px_rgba(255,255,255,0.23),0_10px_24px_rgba(0,0,0,0.18)] backdrop-blur-xl transition duration-300 group-hover:border-white/25 group-hover:bg-white/[0.15] max-sm:h-10 max-sm:w-10">
           <GoogleMark />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className={`min-w-0 flex-1 ${isOpen ? "" : "max-sm:w-full max-sm:flex-none max-sm:text-center"}`}>
+          <span className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${isOpen ? "" : "max-sm:hidden"}`}>
             <span className="text-xs font-medium uppercase tracking-[0.16em] text-orange-300">
               Destino inteligente
             </span>
@@ -344,15 +346,23 @@ export function GoogleReviewsDestinationTool({
             )}
           </span>
           <span className="mt-1 block truncate text-lg font-semibold tracking-tight text-white sm:text-xl">
-            Google Reviews
+            <span className="sm:hidden">Google Reviews</span>
+            <span className="hidden sm:inline">Google Reviews</span>
           </span>
-          <span className="mt-1 block truncate text-sm text-gray-400">
+          {!isOpen && (
+            <span className="mt-1 block truncate text-xs font-medium text-emerald-200 max-sm:text-center sm:hidden">
+              {connectedDestination
+                ? `Conectado a ${connectedDestination.business_name}`
+                : "Sin empresa conectada"}
+            </span>
+          )}
+          <span className={`mt-1 block truncate text-sm text-gray-400 ${isOpen ? "" : "max-sm:hidden"}`}>
             {connectedDestination
               ? connectedDestination.business_name
               : "Conecta tus placas para conseguir más reseñas."}
           </span>
         </span>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/15 text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition duration-300 group-hover:border-orange-300/35 group-hover:bg-orange-300/[0.1] group-hover:text-orange-100">
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/15 text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition duration-300 group-hover:border-orange-300/35 group-hover:bg-orange-300/[0.1] group-hover:text-orange-100 ${isOpen ? "" : "max-sm:hidden"}`}>
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"

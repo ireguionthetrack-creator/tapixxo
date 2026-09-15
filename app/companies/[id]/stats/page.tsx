@@ -515,43 +515,43 @@ if (chartMode === "month") {
 
         {/* RESUMEN */}
 
-        <div className="grid gap-3 md:grid-cols-4">
-            <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-1 rounded-2xl p-5">
-                <p className="text-xs font-medium uppercase tracking-[0.15em] text-gray-500">
+        <div className="grid grid-cols-4 gap-2 md:gap-3">
+            <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-1 min-w-0 rounded-2xl p-3 sm:p-5">
+                <p className="text-[0.6rem] font-medium uppercase leading-tight tracking-[0.12em] text-gray-500 sm:text-xs sm:tracking-[0.15em]">
                     Escaneos hoy
                 </p>
 
-                <p className="mt-3 text-3xl font-semibold tracking-tight">
+                <p className="mt-2 text-xl font-semibold tracking-tight sm:mt-3 sm:text-3xl">
                     {scansToday}
                 </p>
                 </div>
 
-          <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-1 rounded-2xl p-5">
-            <p className="text-xs font-medium uppercase tracking-[0.15em] text-gray-500">
+          <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-1 min-w-0 rounded-2xl p-3 sm:p-5">
+            <p className="text-[0.6rem] font-medium uppercase leading-tight tracking-[0.12em] text-gray-500 sm:text-xs sm:tracking-[0.15em]">
               Total de escaneos
             </p>
 
-            <p className="mt-3 text-3xl font-semibold tracking-tight">
+            <p className="mt-2 text-xl font-semibold tracking-tight sm:mt-3 sm:text-3xl">
               {totalScans}
             </p>
           </div>
 
-          <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-2 rounded-2xl p-5">
-            <p className="text-xs font-medium uppercase tracking-[0.15em] text-gray-500">
+          <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-2 min-w-0 rounded-2xl p-3 sm:p-5">
+            <p className="text-[0.6rem] font-medium uppercase leading-tight tracking-[0.12em] text-gray-500 sm:text-xs sm:tracking-[0.15em]">
               Códigos
             </p>
 
-            <p className="mt-3 text-3xl font-semibold tracking-tight">
+            <p className="mt-2 text-xl font-semibold tracking-tight sm:mt-3 sm:text-3xl">
               {totalCodes}
             </p>
           </div>
 
-          <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-3 rounded-2xl p-5">
-            <p className="text-xs font-medium uppercase tracking-[0.15em] text-gray-500">
+          <div className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-3 min-w-0 rounded-2xl p-3 sm:p-5">
+            <p className="text-[0.6rem] font-medium uppercase leading-tight tracking-[0.12em] text-gray-500 sm:text-xs sm:tracking-[0.15em]">
               Códigos activos
             </p>
 
-            <p className="mt-3 text-3xl font-semibold tracking-tight">
+            <p className="mt-2 text-xl font-semibold tracking-tight sm:mt-3 sm:text-3xl">
               {activeCodes}
             </p>
           </div>
@@ -681,7 +681,7 @@ if (chartMode === "month") {
 </section>
         {/* ESCANEOS POR CÓDIGO */}
 
-        <section className="tapixxo-panel mt-8 overflow-hidden rounded-2xl">
+        <section className="tapixxo-panel mt-8 overflow-visible rounded-2xl">
 
           <div className="border-b border-white/[0.08] p-5 sm:p-6">
 
@@ -695,7 +695,7 @@ if (chartMode === "month") {
 
           </div>
 
-          <div className="divide-y divide-white/[0.07]">
+          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,10.5rem),1fr))] sm:gap-3 sm:p-4">
 
             {codeStats.length === 0 ? (
               <div className="p-6 text-gray-500">
@@ -705,51 +705,35 @@ if (chartMode === "month") {
               codeStats.map((code) => (
                 <div
                   key={code.id}
-                  className="flex flex-col gap-4 p-5 transition hover:bg-white/[0.02] md:flex-row md:items-center md:justify-between sm:px-6"
+                  className="tapixxo-code-tile relative min-h-28 rounded-xl border border-white/[0.12] bg-gradient-to-br from-white/[0.12] to-black/30 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] transition hover:-translate-y-1 hover:border-orange-300/60 hover:from-orange-300/[0.18] hover:shadow-[0_14px_30px_rgba(249,115,22,0.14)]"
                 >
-
-                  <div>
-
-                    <div className="flex items-center gap-3">
-
-                      <span className="font-mono font-semibold">
+                  <div className="flex h-full flex-col justify-center">
+                    <div className="relative flex items-center justify-center">
+                      <span className="font-mono text-sm font-semibold tracking-tight">
                         {code.code}
                       </span>
-                        <p className="text-xs text-gray-500">
-                        Grupo: {code.group_name}
-                        </p>
                       <span
-                        className={
+                        className={`absolute right-0 h-2.5 w-2.5 rounded-full ${
                           code.active
-                            ? "rounded-full border border-orange-400/20 bg-orange-400/10 px-2 py-1 text-xs text-orange-300"
-                            : "rounded-full bg-white/[0.06] px-2 py-1 text-xs text-gray-500"
-                        }
+                            ? "bg-orange-300 shadow-[0_0_10px_rgba(253,186,116,0.9),0_0_20px_rgba(249,115,22,0.45)]"
+                            : "bg-gray-600 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]"
+                        }`}
+                        title={code.active ? "Activo" : "Inactivo"}
                       >
-                        {code.active
-                          ? "Activo"
-                          : "Inactivo"}
+                        <span className="sr-only">{code.active ? "Activo" : "Inactivo"}</span>
                       </span>
-
                     </div>
-
-                    <p className="mt-1 text-xs text-gray-600">
-                      /t/{code.code}
+                    <p className="mt-2 truncate text-center text-xs text-gray-500">
+                      {code.group_name}
                     </p>
-
-                  </div>
-
-                  <div className="text-left md:text-right">
-
-                    <p className="text-2xl font-bold">
+                    <p className="mt-2 text-center text-xl font-bold tracking-tight">
                       {code.scans}
-                    </p>
-
-                    <p className="text-xs text-gray-500">
+                      <span className="ml-1 text-xs font-normal text-gray-500">
                       {code.scans === 1
                         ? "escaneo"
                         : "escaneos"}
+                      </span>
                     </p>
-
                   </div>
 
                 </div>

@@ -12,6 +12,7 @@ import { SignOutButton } from "@/app/components/sign-out-button";
 import { CompanyAvatar } from "@/app/components/company-avatar";
 import { TapixxoMark } from "@/app/components/tapixxo-brand";
 import { LiquidLoader } from "@/app/components/liquid-loader";
+import { ChangePasswordControl } from "@/app/components/change-password-control";
 
 type Company = {
   id: string;
@@ -342,6 +343,7 @@ export default function CompaniesPage() {
               <span className="tapixxo-pulse h-2 w-2 rounded-full bg-orange-400" />
               Sistema activo
             </div>
+            <ChangePasswordControl />
             <SignOutButton />
           </div>
         </div>
@@ -607,7 +609,7 @@ export default function CompaniesPage() {
               Eliminar {companyToDelete.name}
             </h2>
             <p className="mt-3 text-sm leading-6 text-gray-400">
-              Se eliminarán la empresa, sus grupos, códigos, escaneos y cuentas de acceso. Confirma con tu contraseña de administrador.
+              Se eliminarán la empresa, sus grupos, códigos, escaneos y cuentas de acceso. Las órdenes conservan su registro general sin las placas asociadas. Confirma con tu contraseña de administrador.
             </p>
 
             <label className="mt-5 block text-sm text-gray-300">

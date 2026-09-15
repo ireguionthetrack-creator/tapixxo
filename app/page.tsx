@@ -1,384 +1,387 @@
-import Link from "next/link";
-import { StoreHeader } from "@/app/components/store-header";
+import Image from "next/image";
+import { connection } from "next/server";
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import {
+  ArrowRight01Icon,
+  ChartHistogramIcon,
+  DiamondIcon,
+  Dumbbell01Icon,
+  Hotel01Icon,
+  Link01Icon,
+  NfcIcon,
+  RestaurantIcon,
+  ScissorIcon,
+  Settings01Icon,
+  Shield01Icon,
+  SmartPhone01Icon,
+  SparklesIcon,
+  StarIcon,
+} from "@hugeicons/core-free-icons";
+import { LiquidGlass } from "./components/liquid-glass";
+import { LandingNav } from "./components/landing-nav";
+import { ScrollReveal } from "./components/scroll-reveal";
+import { TapixxoBrand } from "./components/tapixxo-brand";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-export default function HomePage() {
+const benefits = [
+  {
+    icon: "star",
+    title: "Más reseñas y reputación",
+    copy: "Facilita que tus clientes te califiquen en Google, TripAdvisor y más.",
+  },
+  {
+    icon: "chart",
+    title: "Estadísticas en tiempo real",
+    copy: "Conoce cuántos escaneos tienes y qué enlace funciona mejor.",
+  },
+  {
+    icon: "settings",
+    title: "100% personalizable",
+    copy: "Cada placa es única y puedes cambiar su destino cuando quieras.",
+  },
+  {
+    icon: "shield",
+    title: "Diseño premium",
+    copy: "Minimalista, elegante y resistente. Hecha para durar.",
+  },
+];
+
+const steps = [
+  ["phone", "Acerca o escanea", "Tu cliente usa su celular con NFC o QR."],
+  ["link", "Se abre tu enlace", "Lo llevas directo a Google, TripAdvisor o donde quieras."],
+  ["star", "Deja su reseña", "Una experiencia simple y rápida."],
+  ["chart", "Tú ves los resultados", "Todo queda registrado en tu panel."],
+];
+
+const useCases = [
+  ["Restaurantes", "restaurant", "/images/tapixxo-use-restaurant.png"],
+  ["Gimnasios", "gym", "/images/tapixxo-use-gym.png"],
+  ["Peluquerías", "salon", "/images/tapixxo-use-salon.png"],
+  ["Hoteles", "hotel", "/images/tapixxo-use-hotel.png"],
+];
+
+type IconName = "star" | "chart" | "settings" | "shield" | "phone" | "link" | "restaurant" | "gym" | "salon" | "hotel" | "nfc" | "sparkle" | "diamond";
+
+const massiveIcons: Record<IconName, IconSvgElement> = {
+  star: StarIcon,
+  chart: ChartHistogramIcon,
+  settings: Settings01Icon,
+  shield: Shield01Icon,
+  phone: SmartPhone01Icon,
+  link: Link01Icon,
+  restaurant: RestaurantIcon,
+  gym: Dumbbell01Icon,
+  salon: ScissorIcon,
+  hotel: Hotel01Icon,
+  nfc: NfcIcon,
+  sparkle: SparklesIcon,
+  diamond: DiamondIcon,
+};
+
+function LineIcon({ name }: { name: IconName }) {
+  return <HugeiconsIcon icon={massiveIcons[name]} size="1em" strokeWidth={1.7} aria-hidden="true" focusable="false" />;
+}
+
+function ArrowIcon() {
+  return <HugeiconsIcon icon={ArrowRight01Icon} size="1em" strokeWidth={1.7} aria-hidden="true" focusable="false" />;
+}
+
+type SocialProofCompany = {
+  id: string;
+  name: string;
+  profile_image_path: string | null;
+};
+
+async function getSocialProofCompanies() {
+  await connection();
+
+  try {
+    const supabase = createAdminClient();
+    const result = await supabase
+      .from("companies")
+      .select("id, name, profile_image_path", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (!result.error) {
+      return {
+        companies: (result.data ?? []) as SocialProofCompany[],
+        count: result.count ?? 0,
+      };
+    }
+
+    if (result.error.code === "42703") {
+      const fallback = await supabase
+        .from("companies")
+        .select("id, name", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      return {
+        companies: (fallback.data ?? []).map((company) => ({
+          ...company,
+          profile_image_path: null,
+        })),
+        count: fallback.count ?? 0,
+      };
+    }
+  } catch {
+    // The landing remains available while the company service is unavailable.
+  }
+
+  return { companies: [], count: 0 };
+}
+
+type LandingMetrics = {
+  companies: number;
+  scans: number;
+};
+
+async function getLandingMetrics(): Promise<LandingMetrics> {
+  await connection();
+
+  try {
+    const supabase = createAdminClient();
+    const [companies, scans] = await Promise.all([
+      supabase.from("companies").select("id", { count: "exact", head: true }),
+      supabase.from("code_scans").select("id", { count: "exact", head: true }),
+    ]);
+
+    return {
+      companies: companies.error ? 0 : companies.count ?? 0,
+      scans: scans.error ? 0 : scans.count ?? 0,
+    };
+  } catch {
+    // Live metrics must not make the landing unavailable.
+    return { companies: 0, scans: 0 };
+  }
+}
+
+const metricFormatter = new Intl.NumberFormat("es-CO");
+
+function getCompanyAvatarUrl(imagePath: string | null) {
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!baseUrl || !imagePath) return null;
+
+  return `${baseUrl}/storage/v1/object/public/company-avatars/${imagePath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")}`;
+}
+
+export default async function Home() {
+  const [socialProof, metrics] = await Promise.all([
+    getSocialProofCompanies(),
+    getLandingMetrics(),
+  ]);
+  const companyLabel = metrics.companies === 1 ? "negocio" : "negocios";
+
   return (
-    <main className="tapixxo-shell min-h-screen text-white">
-
-      <StoreHeader />
-
-
-      {/* HERO */}
-
-      <section className="tapixxo-home-hero relative overflow-hidden">
-        <div className="tapixxo-hero-glow pointer-events-none absolute left-1/2 top-0 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-orange-500/10 blur-[140px]" />
-        <div className="tapixxo-grid pointer-events-none absolute inset-0 opacity-50 [mask-image:linear-gradient(to_bottom,black,transparent_82%)]" />
-
-        <div className="relative mx-auto grid max-w-7xl gap-14 px-5 pb-24 pt-16 sm:px-6 sm:pt-24 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:gap-10 lg:px-8 lg:pb-36 lg:pt-28">
-          <div className="max-w-3xl">
-            <div className="tapixxo-chip tapixxo-enter mb-7 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm text-gray-300">
-              <span className="tapixxo-pulse h-1.5 w-1.5 rounded-full bg-orange-400" />
-              Tecnología de conexión inteligente
-            </div>
-
-            <h1 className="tapixxo-display tapixxo-enter tapixxo-enter-delay-1 text-5xl font-semibold sm:text-6xl lg:text-7xl">
-              Conecta lo físico
-              <br />
-              con lo <span className="tapixxo-hero-word text-gray-400">digital.</span>
-            </h1>
-
-            <p className="tapixxo-enter tapixxo-enter-delay-2 mt-7 max-w-2xl text-base leading-7 text-gray-400 sm:text-lg sm:leading-8">
-              Tapixxo convierte cada punto físico en una puerta hacia tu mundo digital. Una experiencia simple, rápida y diseñada para conectar personas con contenido en un instante.
-            </p>
-
-            <div className="tapixxo-enter tapixxo-enter-delay-3 mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/login"
-                className="tapixxo-button-primary rounded-2xl bg-orange-400 px-6 py-3.5 text-center font-semibold text-black transition hover:bg-orange-300"
-              >
-                Acceder al panel <span aria-hidden="true">→</span>
-              </Link>
-
-              <a
-                href="#como-funciona"
-                className="rounded-2xl border border-white/15 bg-white/[0.045] px-6 py-3.5 text-center font-medium text-white shadow-[inset_0_1px_rgba(255,255,255,0.1)] transition hover:border-orange-300/40 hover:bg-white/[0.09]"
-              >
-                Conocer Tapixxo
-              </a>
-            </div>
-
-            <div className="tapixxo-enter tapixxo-enter-delay-3 mt-9 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-500">
-              <span className="inline-flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-orange-300/90" /> Un toque. Un destino.</span>
-              <span className="hidden h-4 w-px bg-white/15 sm:block" />
-              <span>Actualiza cuando quieras.</span>
-            </div>
-          </div>
-
-          <div className="tapixxo-hero-stage tapixxo-enter tapixxo-enter-delay-2 mx-auto w-full max-w-[29rem]" aria-hidden="true">
-            <div className="tapixxo-hero-orbit tapixxo-hero-orbit-one" />
-            <div className="tapixxo-hero-orbit tapixxo-hero-orbit-two" />
-            <div className="tapixxo-hero-orbit tapixxo-hero-orbit-three" />
-            <div className="tapixxo-hero-plate">
-              <div className="tapixxo-hero-plate-shine" />
-              <div className="relative flex h-full flex-col justify-between p-6 sm:p-8">
-                <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.2em] text-gray-400">
-                  <span>Tapixxo</span>
-                  <span className="flex items-center gap-1.5 text-orange-200"><span className="h-1.5 w-1.5 rounded-full bg-orange-300" /> Activo</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className="tapixxo-nfc-mark">
-                    <span className="tapixxo-nfc-ring tapixxo-nfc-ring-one" />
-                    <span className="tapixxo-nfc-ring tapixxo-nfc-ring-two" />
-                    <svg viewBox="0 0 24 24" className="relative z-10 h-10 w-10 fill-none stroke-white stroke-[1.35]"><path d="M8.1 8.1a5.5 5.5 0 0 1 7.78 0M5.27 5.27a9.5 9.5 0 0 1 13.46 0M10.93 10.93a1.5 1.5 0 0 1 2.14 0M12 14.5v.01" strokeLinecap="round" /></svg>
-                  </div>
-                  <p className="mt-5 text-lg font-medium tracking-[0.12em] text-white">TAPIXXO</p>
-                  <p className="mt-1 text-xs text-gray-400">Acerca tu celular</p>
-                </div>
-                <div className="flex items-end justify-between">
-                  <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[10px] text-gray-300">NFC + QR</span>
-                  <span className="font-mono text-xs tracking-[0.14em] text-gray-400">T • 1000</span>
-                </div>
-              </div>
-            </div>
-            <div className="tapixxo-hero-float-card tapixxo-hero-float-top"><span className="text-orange-200">↗</span><span>Destino actualizado</span></div>
-            <div className="tapixxo-hero-float-card tapixxo-hero-float-bottom"><span className="tapixxo-pulse h-2 w-2 rounded-full bg-emerald-300" /><span>Listo para conectar</span></div>
-          </div>
-        </div>
-      </section>
-
-
-      {/* SEPARADOR */}
-
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="h-px bg-white/10" />
-      </div>
-
-
-      {/* COMO FUNCIONA */}
-
-      <section
-        id="como-funciona"
-        className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32"
-      >
-
-        <div className="max-w-2xl">
-
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-orange-500">
-            Cómo funciona
-          </p>
-
-          <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Simple para todos.
-          </h2>
-
-          <p className="mt-5 text-gray-400">
-            Tapixxo está diseñado para que la tecnología
-            desaparezca y solo quede la experiencia.
-          </p>
-
-        </div>
-
-
-        <div className="mt-12 grid gap-4 md:mt-16 md:grid-cols-3">
-
-              <div className="tapixxo-glass-card tapixxo-enter p-7 sm:p-8">
-
-            <span className="text-sm text-gray-600">
-              01
-            </span>
-
-            <h3 className="mt-8 text-xl font-semibold">
-              Acerca
-            </h3>
-
-            <p className="mt-4 leading-7 text-gray-400">
-              El usuario encuentra un código Tapixxo
-              en un espacio físico.
-            </p>
-
-          </div>
-
-
-              <div className="tapixxo-glass-card tapixxo-enter tapixxo-enter-delay-1 p-7 sm:p-8">
-
-            <span className="text-sm text-gray-600">
-              02
-            </span>
-
-            <h3 className="mt-8 text-xl font-semibold">
-              Escanea
-            </h3>
-
-            <p className="mt-4 leading-7 text-gray-400">
-              Un simple escaneo conecta inmediatamente
-              el punto físico con su destino digital.
-            </p>
-
-          </div>
-
-
-              <div className="tapixxo-glass-card tapixxo-enter tapixxo-enter-delay-2 p-7 sm:p-8">
-
-            <span className="text-sm text-gray-600">
-              03
-            </span>
-
-            <h3 className="mt-8 text-xl font-semibold">
-              Conecta
-            </h3>
-
-            <p className="mt-4 leading-7 text-gray-400">
-              La experiencia continúa en el contenido
-              que cada empresa haya configurado.
-            </p>
-
-          </div>
-
-        </div>
-
-      </section>
-
-
-      {/* PARA EMPRESAS */}
-
-      <section className="border-y border-white/10 bg-white/[0.025] backdrop-blur-sm">
-
-        <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
-
-          <div className="grid gap-16 md:grid-cols-2 md:items-center">
-
-            <div>
-
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-orange-500">
-                Para empresas
-              </p>
-
-              <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Tu contenido.
-                <br />
-                Tu control.
-              </h2>
-
-              <p className="mt-6 max-w-xl leading-7 text-gray-400">
-                Administra tus destinos digitales desde un
-                único lugar y modifica tus enlaces cuando
-                lo necesites.
-              </p>
-
-            </div>
-
-
-            <div className="grid gap-4 sm:grid-cols-2">
-
-              <div className="tapixxo-glass-card p-6">
-
-                <div className="mb-5 text-2xl">
-                  ↗
-                </div>
-
-                <h3 className="font-semibold">
-                  Enlaces dinámicos
-                </h3>
-
-                <p className="mt-3 text-sm leading-6 text-gray-500">
-                  Cambia el destino sin tener que reemplazar
-                  el código físico.
-                </p>
-
-              </div>
-
-
-              <div className="tapixxo-glass-card p-6">
-
-                <div className="mb-5 text-2xl">
-                  ◉
-                </div>
-
-                <h3 className="font-semibold">
-                  Estadísticas
-                </h3>
-
-                <p className="mt-3 text-sm leading-6 text-gray-500">
-                  Consulta el rendimiento de tus códigos.
-                </p>
-
-              </div>
-
-
-              <div className="tapixxo-glass-card p-6">
-
-                <div className="mb-5 text-2xl">
-                  #
-                </div>
-
-                <h3 className="font-semibold">
-                  Organización
-                </h3>
-
-                <p className="mt-3 text-sm leading-6 text-gray-500">
-                  Organiza tus códigos mediante grupos.
-                </p>
-
-              </div>
-
-
-              <div className="tapixxo-glass-card p-6">
-
-                <div className="mb-5 text-2xl">
-                  ✓
-                </div>
-
-                <h3 className="font-semibold">
-                  Siempre disponible
-                </h3>
-
-                <p className="mt-3 text-sm leading-6 text-gray-500">
-                  Actualiza los destinos sin reemplazar
-                  los códigos físicos.
-                </p>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </section>
-
-
-      {/* CTA */}
-
-      <section className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
-
-        <div className="tapixxo-liquid-cta relative rounded-3xl px-6 py-14 text-center sm:px-16 sm:py-16">
-
-          <div className="pointer-events-none absolute left-1/2 top-0 h-64 w-64 -translate-x-1/2 rounded-full bg-orange-500/10 blur-[100px]" />
-
-          <div className="relative">
-
-            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              El mundo físico tiene
-              <br />
-              mucho más que decir.
-            </h2>
-
-            <p className="mx-auto mt-5 max-w-xl text-gray-400">
-              Tapixxo crea el puente entre ambos mundos.
-            </p>
-
-              <Link
-                href="/login"
-                className="tapixxo-button-primary mt-8 inline-flex rounded-2xl bg-orange-400 px-6 py-3.5 font-semibold text-black transition hover:bg-orange-300"
+    <main className="tapixxo-landing">
+      <section className="tapixxo-showcase-hero" aria-labelledby="hero-title">
+        <Image
+          src="/images/tapixxo-hero-plaque-wide.png"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="tapixxo-showcase-backdrop"
+        />
+        <div className="tapixxo-showcase-backdrop-shade" aria-hidden="true" />
+
+        <LandingNav />
+
+        <div className="tapixxo-landing-wrap tapixxo-showcase-hero-grid" id="inicio">
+          <div className="tapixxo-showcase-copy">
+            <LiquidGlass
+              className="tapixxo-srdavo-surface tapixxo-srdavo-kicker-surface"
+              radius={999}
+              depth={2}
+              blur={2}
+              strength={42}
+              backgroundColor="rgba(20, 18, 16, 0.36)"
             >
-              Entrar a Tapixxo
-            </Link>
-
-          </div>
-
-        </div>
-
-      </section>
-
-
-      {/* CONTACTO */}
-
-      <section className="mx-auto max-w-7xl px-5 pb-20 sm:px-6 lg:px-8 lg:pb-28">
-        <div className="tapixxo-panel relative overflow-hidden rounded-3xl border border-white/[0.12] px-5 py-8 shadow-[inset_0_1px_1px_rgba(255,255,255,0.16),0_24px_60px_rgba(0,0,0,0.22)] sm:px-8 sm:py-10">
-          <div className="pointer-events-none absolute right-0 top-1/2 h-52 w-52 -translate-y-1/2 rounded-full bg-orange-400/[0.09] blur-[90px]" />
-          <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-orange-300">Contacto</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">Hablemos.</h2>
-              <p className="mt-2 text-sm text-gray-400 sm:text-base">Estamos aquí para ayudarte a conectar mejor.</p>
+              <p className="tapixxo-showcase-kicker">NFC · QR · Experiencias reales</p>
+            </LiquidGlass>
+            <h1 id="hero-title">Conecta experiencias <span>reales.</span></h1>
+            <p className="tapixxo-showcase-lede">
+              Placas NFC y QR para convertir una visita en una reseña, una conversación o el siguiente paso de tu marca.
+            </p>
+            <div className="tapixxo-showcase-actions">
+              <LiquidGlass className="tapixxo-srdavo-surface tapixxo-srdavo-control tapixxo-srdavo-control-warm tapixxo-login-control" radius={21} strength={50} backgroundColor="rgba(255, 112, 38, 0.78)">
+                <a className="tapixxo-liquid-button tapixxo-liquid-button-primary tapixxo-login-button" href="/login">
+                  Iniciar sesión
+                </a>
+              </LiquidGlass>
+              <LiquidGlass className="tapixxo-srdavo-surface tapixxo-srdavo-control" radius={21} strength={50} backgroundColor="rgba(22, 22, 21, 0.34)">
+                <a className="tapixxo-liquid-button tapixxo-liquid-button-quiet" href="#como-funciona">
+                  Ver cómo funciona
+                </a>
+              </LiquidGlass>
             </div>
+            <div className="tapixxo-showcase-social-proof" aria-label={`${metrics.companies} ${companyLabel} que usan Tapixxo`}>
+              <div className="tapixxo-showcase-avatars" aria-label="Empresas registradas recientemente">
+                {socialProof.companies.map((company, index) => {
+                  const avatarUrl = getCompanyAvatarUrl(company.profile_image_path);
 
-            <div className="grid gap-2 sm:min-w-[320px]">
-              <a
-                href="mailto:hola@tapixxo.com"
-                className="group flex min-h-12 items-center gap-3 rounded-2xl border border-white/[0.12] bg-white/[0.055] px-4 text-sm text-gray-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:border-orange-300/45 hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300/70"
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-300/[0.12] text-orange-200 transition group-hover:bg-orange-300/[0.2]">
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-[1.8]"><path d="M3.75 6.75 12 12.75l8.25-6M5.25 18.75h13.5a1.5 1.5 0 0 0 1.5-1.5v-10.5a1.5 1.5 0 0 0-1.5-1.5H5.25a1.5 1.5 0 0 0-1.5 1.5v10.5a1.5 1.5 0 0 0 1.5 1.5Z" /></svg>
-                </span>
-                <span className="min-w-0 flex-1 truncate">Hola@tapixxo.com</span>
-                <span aria-hidden="true" className="text-gray-500 transition group-hover:translate-x-0.5 group-hover:text-orange-200">↗</span>
-              </a>
-              <a
-                href="tel:+573016728011"
-                className="group flex min-h-12 items-center gap-3 rounded-2xl border border-white/[0.12] bg-white/[0.055] px-4 text-sm text-gray-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:border-orange-300/45 hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300/70"
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-300/[0.12] text-orange-200 transition group-hover:bg-orange-300/[0.2]">
-                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-[1.8]"><path d="M6.62 10.79a15.46 15.46 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.32.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1C10.61 21 3 13.39 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.24 1.02l-2.21 2.2Z" /></svg>
-                </span>
-                <span className="min-w-0 flex-1">+57 301 672 8011</span>
-                <span aria-hidden="true" className="text-gray-500 transition group-hover:translate-x-0.5 group-hover:text-orange-200">↗</span>
-              </a>
+                  return (
+                    <span className="tapixxo-showcase-avatar" key={company.id} style={{ animationDelay: `${index * -1.15}s` }} aria-hidden="true">
+                      {avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL is dynamic.
+                        <img src={avatarUrl} alt="" />
+                      ) : (
+                        <span className="tapixxo-showcase-avatar-fallback" />
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+              <p><strong>{metrics.companies} {companyLabel}</strong><span>ya activan experiencias con Tapixxo.</span></p>
             </div>
           </div>
         </div>
+
+        <LiquidGlass
+          className="tapixxo-srdavo-surface tapixxo-showcase-outcome-surface"
+          radius={22}
+          depth={3}
+          blur={3}
+          strength={50}
+          backgroundColor="rgba(19, 17, 15, 0.42)"
+        >
+          <aside className="tapixxo-showcase-outcome" aria-label="Resultados que impulsa Tapixxo">
+            <p>Impacto que se nota</p>
+            <strong>Más reseñas</strong>
+            <strong>Más clientes</strong>
+            <strong>Más rendimiento</strong>
+          </aside>
+        </LiquidGlass>
       </section>
 
+      <section className="tapixxo-showcase-benefits" id="beneficios" aria-label="Beneficios de Tapixxo">
+        <ScrollReveal className="tapixxo-landing-wrap">
+          <div className="tapixxo-showcase-benefit-grid">
+            {benefits.map((benefit) => (
+              <LiquidGlass
+                className="tapixxo-srdavo-surface tapixxo-showcase-benefit-surface"
+                key={benefit.title}
+                radius={18}
+                depth={3}
+                blur={3}
+                strength={48}
+                backgroundColor="rgba(33, 29, 26, 0.46)"
+              >
+                <article className="tapixxo-showcase-benefit">
+                  <span className="tapixxo-showcase-feature-icon"><LineIcon name={benefit.icon as IconName} /></span>
+                  <h3>{benefit.title}</h3>
+                  <span>{benefit.copy}</span>
+                </article>
+              </LiquidGlass>
+            ))}
+          </div>
+        </ScrollReveal>
+      </section>
 
-      {/* FOOTER */}
+      <section className="tapixxo-showcase-product" id="producto" aria-labelledby="product-title">
+        <ScrollReveal className="tapixxo-landing-wrap tapixxo-showcase-product-panel">
+          <div className="tapixxo-showcase-product-intro">
+            <h2 id="product-title">Un producto, infinitas posibilidades</h2>
+            <p>
+              Tapixxo se adapta a restaurantes, hoteles, estudios, comercios y servicios que quieren acercar su mundo digital de una forma más natural.
+            </p>
+          </div>
+          <div className="tapixxo-showcase-use-cases" aria-label="Casos de uso">
+            {useCases.map(([label, icon, image]) => (
+              <article className="tapixxo-showcase-use-case" key={label}>
+                <Image src={image} alt={`Placa Tapixxo en ${label.toLowerCase()}`} fill sizes="(max-width: 767px) 50vw, 25vw" />
+                <div><LineIcon name={icon as IconName} /><span>{label}</span></div>
+              </article>
+            ))}
+          </div>
+        </ScrollReveal>
+      </section>
 
-      <footer className="tapixxo-nav-glass border-t border-white/10">
+      <section className="tapixxo-showcase-steps" id="como-funciona" aria-labelledby="steps-title">
+        <ScrollReveal className="tapixxo-landing-wrap tapixxo-showcase-steps-panel">
+          <div className="tapixxo-showcase-steps-heading">
+            <h2 id="steps-title">Cómo funciona</h2>
+            <p>Simple para tus clientes.<br />Potente para tu negocio.</p>
+          </div>
+          <div className="tapixxo-showcase-step-grid">
+            {steps.map(([icon, title, copy], index) => (
+              <article key={title}>
+                <span className="tapixxo-showcase-step-icon"><LineIcon name={icon as IconName} /></span>
+                <h3>{title}</h3>
+                <span>{copy}</span>
+                {index < steps.length - 1 && <span className="tapixxo-showcase-step-arrow"><ArrowIcon /></span>}
+              </article>
+            ))}
+          </div>
+        </ScrollReveal>
+      </section>
 
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-8 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+      <section className="tapixxo-product-design" id="placa" aria-labelledby="product-design-title">
+        <ScrollReveal className="tapixxo-landing-wrap">
+          <div className="tapixxo-product-design-panel">
+            <div className="tapixxo-product-design-visual" aria-hidden="true">
+              <Image src="/images/tapixxo-product-feature.png" alt="" fill sizes="(max-width: 767px) 100vw, 96rem" priority={false} />
+            </div>
+            <div className="tapixxo-product-design-copy">
+              <h2 id="product-design-title">Diseñado para <span>el mundo real</span></h2>
+              <p>Materiales de alta calidad, acabado premium y un diseño minimalista que se adapta a cualquier espacio. Tecnología invisible, impacto real.</p>
+              <a className="tapixxo-product-design-cta" href="#contacto">Conoce el producto <ArrowIcon /></a>
+              <ul aria-label="Características de la placa Tapixxo">
+                <li><LineIcon name="nfc" /><span>NFC + QR</span></li>
+                <li><LineIcon name="shield" /><span>Resistente</span></li>
+                <li><LineIcon name="sparkle" /><span>Larga vida útil</span></li>
+                <li><LineIcon name="diamond" /><span>Diseño elegante</span></li>
+              </ul>
+            </div>
+            <dl className="tapixxo-product-design-specs">
+              <div><dt>100 mm</dt><dd>Alto</dd></div>
+              <div><dt>76 mm</dt><dd>Ancho</dd></div>
+              <div><dt>40 mm</dt><dd>Profundidad</dd></div>
+            </dl>
+          </div>
+          <div className="tapixxo-product-metrics" aria-label="Tapixxo en cifras">
+            <TapixxoBrand className="tapixxo-product-metrics-brand" />
+            <span className="tapixxo-product-metrics-copy">Tecnología simple.<br />Resultados extraordinarios.</span>
+            <span><strong>{metricFormatter.format(metrics.companies)}</strong><small>Negocios</small></span>
+            <span><strong>{metricFormatter.format(metrics.scans)}</strong><small>Escaneos</small></span>
+            <span><strong aria-label="Calificación promedio sin datos vinculados">—</strong><small>Calificación promedio</small></span>
+          </div>
+        </ScrollReveal>
+      </section>
 
-          <p>
-            © {new Date().getFullYear()} Tapixxo
-          </p>
+      <section className="tapixxo-showcase-close" id="precios" aria-labelledby="contact-title">
+        <ScrollReveal className="tapixxo-landing-wrap tapixxo-showcase-close-panel">
+          <div>
+            <p className="tapixxo-landing-kicker">Tapixxo para tu negocio</p>
+            <h2 id="contact-title">Haz que cada visita llegue más lejos.</h2>
+          </div>
+          <div className="tapixxo-showcase-contact-actions" id="contacto">
+            <LiquidGlass className="tapixxo-srdavo-surface tapixxo-srdavo-control tapixxo-srdavo-control-warm" radius={21} strength={50} backgroundColor="rgba(255, 112, 38, 0.78)">
+              <a className="tapixxo-liquid-button tapixxo-liquid-button-primary" href="https://wa.me/573016728011" target="_blank" rel="noreferrer">
+                WhatsApp
+              </a>
+            </LiquidGlass>
+            <LiquidGlass className="tapixxo-srdavo-surface tapixxo-srdavo-control" radius={21} strength={46} backgroundColor="rgba(31, 25, 21, 0.52)">
+              <a className="tapixxo-liquid-button tapixxo-liquid-button-quiet" href="mailto:hola@tapixxo.com?subject=Quiero%20cotizar%20Tapixxo">
+                hola@tapixxo.com
+              </a>
+            </LiquidGlass>
+          </div>
+        </ScrollReveal>
+      </section>
 
-          <p>
-            Conectando lo físico con lo digital.
-          </p>
-
+      <footer className="tapixxo-showcase-footer">
+        <div className="tapixxo-landing-wrap">
+          <TapixxoBrand />
+          <span>Tapixxo · Tecnología que conecta personas.</span>
+          <span>© {new Date().getFullYear()} Tapixxo</span>
         </div>
-
       </footer>
-
     </main>
   );
 }

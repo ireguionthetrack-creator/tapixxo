@@ -262,18 +262,18 @@ export function CodeScheduleDestinationTool({
   }
 
   return (
-    <section className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-2 h-full min-w-0 overflow-hidden rounded-2xl border border-white/[0.12] shadow-[0_24px_70px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.2)] sm:rounded-3xl">
+    <section data-open={open} className="tapixxo-panel tapixxo-enter tapixxo-enter-delay-2 tapixxo-mobile-destination-card relative isolate h-full min-w-0 overflow-hidden rounded-2xl border border-white/[0.12] shadow-[0_24px_70px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.2)] sm:rounded-3xl">
       <button type="button" onClick={() => setOpen((value) => { const nextOpen = !value; onOpenChange?.(nextOpen); return nextOpen; })} aria-expanded={open}
-        className="group flex min-h-24 w-full items-center gap-3 px-4 py-4 text-left transition duration-500 hover:bg-white/[0.055] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300/70 sm:min-h-28 sm:gap-4 sm:px-6">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-orange-200/25 bg-gradient-to-br from-orange-200/[0.23] via-orange-400/[0.13] to-white/[0.05] text-orange-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.32),0_12px_26px_rgba(0,0,0,0.2)] backdrop-blur-xl transition duration-500 group-hover:scale-105 group-hover:border-orange-200/50 group-hover:shadow-[0_14px_32px_rgba(249,115,22,0.18)]">
+        className={`group flex min-h-24 w-full items-center gap-3 px-4 py-4 text-left transition duration-500 hover:bg-white/[0.055] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300/70 sm:min-h-28 sm:gap-4 sm:px-6 ${open ? "" : "max-sm:min-h-36 max-sm:flex-col max-sm:items-center max-sm:justify-center max-sm:gap-2 max-sm:px-3 max-sm:text-center"}`}>
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-orange-200/25 bg-gradient-to-br from-orange-200/[0.23] via-orange-400/[0.13] to-white/[0.05] text-orange-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.32),0_12px_26px_rgba(0,0,0,0.2)] backdrop-blur-xl transition duration-500 group-hover:scale-105 group-hover:border-orange-200/50 group-hover:shadow-[0_14px_32px_rgba(249,115,22,0.18)] max-sm:h-10 max-sm:w-10">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6"><circle cx="12" cy="12" r="7.5"/><path d="M12 8v4.5l3 1.8"/><path d="M5 3.8 3.5 5.3M19 3.8l1.5 1.5"/></svg>
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="text-xs font-medium uppercase tracking-[0.16em] text-orange-300">Destino inteligente</span>
-          <span className="mt-1 block text-lg font-semibold tracking-tight text-white sm:text-xl">Destinos por horario</span>
-          <span className="mt-1 block text-sm text-gray-400">Cambia el destino de cada placa según la hora.</span>
+        <span className={`min-w-0 flex-1 ${open ? "" : "max-sm:w-full max-sm:flex-none max-sm:text-center"}`}>
+          <span className={`text-xs font-medium uppercase tracking-[0.16em] text-orange-300 ${open ? "" : "max-sm:hidden"}`}>Destino inteligente</span>
+          <span className={`mt-1 block text-lg font-semibold tracking-tight text-white sm:text-xl ${open ? "" : "max-sm:text-base"}`}><span className="sm:hidden">Destinos por horario</span><span className="hidden sm:inline">Destinos por horario</span></span>
+          <span className={`mt-1 block text-sm text-gray-400 ${open ? "" : "max-sm:hidden"}`}>Cambia el destino de cada placa según la hora.</span>
         </span>
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.12] bg-white/[0.06] text-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] transition duration-500 group-hover:border-orange-300/40 group-hover:bg-orange-300/[0.1] ${open ? "rotate-180" : ""}`}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5"><path d="m6 9 6 6 6-6"/></svg></span>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.12] bg-white/[0.06] text-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] transition duration-500 group-hover:border-orange-300/40 group-hover:bg-orange-300/[0.1] ${open ? "rotate-180" : "max-sm:hidden"}`}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5"><path d="m6 9 6 6 6-6"/></svg></span>
       </button>
       <div className={`grid transition-[grid-template-rows,opacity] duration-500 ease-out ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
         <div className="overflow-hidden">

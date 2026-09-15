@@ -256,6 +256,61 @@ export async function DELETE(
       const codeIds = (codes ?? []).map((code) => code.id);
 
       if (codeIds.length > 0) {
+        // Las placas vendidas conservan una unidad de inventario y una línea de
+        // pedido. Se eliminan esas referencias antes de borrar sus códigos; la
+        // orden principal permanece como registro administrativo.
+        const { data: inventoryUnits, error: inventoryUnitsError } = await supabaseAdmin
+          .from("inventory_units")
+          .select("id")
+          .in("code_id", codeIds);
+
+        if (inventoryUnitsError) {
+          return NextResponse.json(
+            { error: inventoryUnitsError.message },
+            { status: 500 }
+          );
+        }
+
+        const inventoryUnitIds = (inventoryUnits ?? []).map((unit) => unit.id);
+
+        if (inventoryUnitIds.length > 0) {
+          const { error: orderUnitsDeleteError } = await supabaseAdmin
+            .from("store_order_units")
+            .delete()
+            .in("inventory_unit_id", inventoryUnitIds);
+
+          if (orderUnitsDeleteError) {
+            return NextResponse.json(
+              { error: orderUnitsDeleteError.message },
+              { status: 500 }
+            );
+          }
+
+          const { error: replacementReferenceError } = await supabaseAdmin
+            .from("inventory_units")
+            .update({ replacement_for_inventory_unit_id: null })
+            .in("replacement_for_inventory_unit_id", inventoryUnitIds);
+
+          if (replacementReferenceError) {
+            return NextResponse.json(
+              { error: replacementReferenceError.message },
+              { status: 500 }
+            );
+          }
+
+          const { error: inventoryDeleteError } = await supabaseAdmin
+            .from("inventory_units")
+            .delete()
+            .in("id", inventoryUnitIds);
+
+          if (inventoryDeleteError) {
+            return NextResponse.json(
+              { error: inventoryDeleteError.message },
+              { status: 500 }
+            );
+          }
+        }
+
         const { error: scansError } = await supabaseAdmin
           .from("code_scans")
           .delete()

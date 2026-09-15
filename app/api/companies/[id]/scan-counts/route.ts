@@ -76,7 +76,7 @@ export async function GET(
     const groupIds = (groups ?? []).map((group) => group.id);
 
     if (groupIds.length === 0) {
-      return NextResponse.json({ counts: {} });
+      return NextResponse.json({ counts: {}, today_count: 0 });
     }
 
     const { data: codes, error: codesError } = await supabaseAdmin
@@ -94,17 +94,37 @@ export async function GET(
     const codeIds = (codes ?? []).map((code) => code.id);
 
     if (codeIds.length === 0) {
-      return NextResponse.json({ counts: {} });
+      return NextResponse.json({ counts: {}, today_count: 0 });
     }
 
-    const { data: scans, error: scansError } = await supabaseAdmin
-      .from("code_scans")
-      .select("code_id")
-      .in("code_id", codeIds);
+    const bogotaDateParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Bogota",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const bogotaDate = ["year", "month", "day"].map((type) =>
+      bogotaDateParts.find((part) => part.type === type)?.value
+    ).join("-");
+    const startOfToday = new Date(`${bogotaDate}T00:00:00-05:00`).toISOString();
 
-    if (scansError) {
+    const [scansResult, todayResult] = await Promise.all([
+      supabaseAdmin
+        .from("code_scans")
+        .select("code_id")
+        .in("code_id", codeIds),
+      supabaseAdmin
+        .from("code_scans")
+        .select("id", { count: "exact", head: true })
+        .in("code_id", codeIds)
+        .gte("created_at", startOfToday),
+    ]);
+
+    const { data: scans, error: scansError } = scansResult;
+
+    if (scansError || todayResult.error) {
       return NextResponse.json(
-        { error: scansError.message },
+        { error: scansError?.message ?? todayResult.error?.message },
         { status: 500 }
       );
     }
@@ -115,7 +135,7 @@ export async function GET(
       counts[scan.code_id] = (counts[scan.code_id] ?? 0) + 1;
     }
 
-    return NextResponse.json({ counts });
+    return NextResponse.json({ counts, today_count: todayResult.count ?? 0 });
   } catch (error) {
     return NextResponse.json(
       {
