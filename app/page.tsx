@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { connection } from "next/server";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import {
   ArrowRight01Icon,
@@ -21,7 +20,7 @@ import { LiquidGlass } from "./components/liquid-glass";
 import { LandingNav } from "./components/landing-nav";
 import { ScrollReveal } from "./components/scroll-reveal";
 import { TapixxoBrand } from "./components/tapixxo-brand";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getLandingData } from "@/lib/landing-data";
 
 const benefits = [
   {
@@ -54,10 +53,10 @@ const steps = [
 ];
 
 const useCases = [
-  ["Restaurantes", "restaurant", "/images/tapixxo-use-restaurant.png"],
-  ["Gimnasios", "gym", "/images/tapixxo-use-gym.png"],
-  ["Peluquerías", "salon", "/images/tapixxo-use-salon.png"],
-  ["Hoteles", "hotel", "/images/tapixxo-use-hotel.png"],
+  ["Restaurantes", "restaurant", "/images/tapixxo-use-restaurant.webp"],
+  ["Gimnasios", "gym", "/images/tapixxo-use-gym.webp"],
+  ["Peluquerías", "salon", "/images/tapixxo-use-salon.webp"],
+  ["Hoteles", "hotel", "/images/tapixxo-use-hotel.webp"],
 ];
 
 type IconName = "star" | "chart" | "settings" | "shield" | "phone" | "link" | "restaurant" | "gym" | "salon" | "hotel" | "nfc" | "sparkle" | "diamond";
@@ -86,77 +85,6 @@ function ArrowIcon() {
   return <HugeiconsIcon icon={ArrowRight01Icon} size="1em" strokeWidth={1.7} aria-hidden="true" focusable="false" />;
 }
 
-type SocialProofCompany = {
-  id: string;
-  name: string;
-  profile_image_path: string | null;
-};
-
-async function getSocialProofCompanies() {
-  await connection();
-
-  try {
-    const supabase = createAdminClient();
-    const result = await supabase
-      .from("companies")
-      .select("id, name, profile_image_path", { count: "exact" })
-      .order("created_at", { ascending: false })
-      .limit(5);
-
-    if (!result.error) {
-      return {
-        companies: (result.data ?? []) as SocialProofCompany[],
-        count: result.count ?? 0,
-      };
-    }
-
-    if (result.error.code === "42703") {
-      const fallback = await supabase
-        .from("companies")
-        .select("id, name", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      return {
-        companies: (fallback.data ?? []).map((company) => ({
-          ...company,
-          profile_image_path: null,
-        })),
-        count: fallback.count ?? 0,
-      };
-    }
-  } catch {
-    // The landing remains available while the company service is unavailable.
-  }
-
-  return { companies: [], count: 0 };
-}
-
-type LandingMetrics = {
-  companies: number;
-  scans: number;
-};
-
-async function getLandingMetrics(): Promise<LandingMetrics> {
-  await connection();
-
-  try {
-    const supabase = createAdminClient();
-    const [companies, scans] = await Promise.all([
-      supabase.from("companies").select("id", { count: "exact", head: true }),
-      supabase.from("code_scans").select("id", { count: "exact", head: true }),
-    ]);
-
-    return {
-      companies: companies.error ? 0 : companies.count ?? 0,
-      scans: scans.error ? 0 : scans.count ?? 0,
-    };
-  } catch {
-    // Live metrics must not make the landing unavailable.
-    return { companies: 0, scans: 0 };
-  }
-}
-
 const metricFormatter = new Intl.NumberFormat("es-CO");
 
 function getCompanyAvatarUrl(imagePath: string | null) {
@@ -171,17 +99,14 @@ function getCompanyAvatarUrl(imagePath: string | null) {
 }
 
 export default async function Home() {
-  const [socialProof, metrics] = await Promise.all([
-    getSocialProofCompanies(),
-    getLandingMetrics(),
-  ]);
-  const companyLabel = metrics.companies === 1 ? "negocio" : "negocios";
+  const landingData = await getLandingData();
+  const companyLabel = landingData.companyCount === 1 ? "negocio" : "negocios";
 
   return (
     <main className="tapixxo-landing">
       <section className="tapixxo-showcase-hero" aria-labelledby="hero-title">
         <Image
-          src="/images/tapixxo-hero-plaque-wide.png"
+          src="/images/tapixxo-hero-plaque-wide.webp"
           alt=""
           fill
           priority
@@ -220,9 +145,9 @@ export default async function Home() {
                 </a>
               </LiquidGlass>
             </div>
-            <div className="tapixxo-showcase-social-proof" aria-label={`${metrics.companies} ${companyLabel} que usan Tapixxo`}>
+            <div className="tapixxo-showcase-social-proof" aria-label={`${landingData.companyCount} ${companyLabel} que usan Tapixxo`}>
               <div className="tapixxo-showcase-avatars" aria-label="Empresas registradas recientemente">
-                {socialProof.companies.map((company, index) => {
+                {landingData.companies.map((company, index) => {
                   const avatarUrl = getCompanyAvatarUrl(company.profile_image_path);
 
                   return (
@@ -237,7 +162,7 @@ export default async function Home() {
                   );
                 })}
               </div>
-              <p><strong>{metrics.companies} {companyLabel}</strong><span>ya activan experiencias con Tapixxo.</span></p>
+              <p><strong>{landingData.companyCount} {companyLabel}</strong><span>ya activan experiencias con Tapixxo.</span></p>
             </div>
           </div>
         </div>
@@ -325,7 +250,7 @@ export default async function Home() {
         <ScrollReveal className="tapixxo-landing-wrap">
           <div className="tapixxo-product-design-panel">
             <div className="tapixxo-product-design-visual" aria-hidden="true">
-              <Image src="/images/tapixxo-product-feature.png" alt="" fill sizes="(max-width: 767px) 100vw, 96rem" priority={false} />
+              <Image src="/images/tapixxo-product-feature.webp" alt="" fill sizes="(max-width: 767px) 100vw, 96rem" priority={false} />
             </div>
             <div className="tapixxo-product-design-copy">
               <h2 id="product-design-title">Diseñado para <span>el mundo real</span></h2>
@@ -347,8 +272,8 @@ export default async function Home() {
           <div className="tapixxo-product-metrics" aria-label="Tapixxo en cifras">
             <TapixxoBrand className="tapixxo-product-metrics-brand" />
             <span className="tapixxo-product-metrics-copy">Tecnología simple.<br />Resultados extraordinarios.</span>
-            <span><strong>{metricFormatter.format(metrics.companies)}</strong><small>Negocios</small></span>
-            <span><strong>{metricFormatter.format(metrics.scans)}</strong><small>Escaneos</small></span>
+            <span><strong>{metricFormatter.format(landingData.companyCount)}</strong><small>Negocios</small></span>
+            <span><strong>{metricFormatter.format(landingData.scanCount)}</strong><small>Escaneos</small></span>
             <span><strong aria-label="Calificación promedio sin datos vinculados">—</strong><small>Calificación promedio</small></span>
           </div>
         </ScrollReveal>

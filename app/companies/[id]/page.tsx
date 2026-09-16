@@ -315,8 +315,8 @@ export default function CompanyPage() {
    * ----------------------------------------------------
    */
 
-  async function loadGroups() {
-    const { data, error } = await supabase
+  async function loadGroupsAndCodes() {
+    const { data: groupData, error: groupError } = await supabase
       .from("code_groups")
       .select(
         "id, name, description, created_at"
@@ -326,48 +326,22 @@ export default function CompanyPage() {
         ascending: false,
       });
 
-    if (error) {
-      setError(error.message);
-      return;
-    }
-
-    setGroups(data ?? []);
-  }
-
-  /*
-   * ----------------------------------------------------
-   * CARGAR CÓDIGOS
-   * ----------------------------------------------------
-   *
-   * Los códigos se obtienen a través de los grupos
-   * pertenecientes a esta empresa.
-   */
-
-  async function loadCodes() {
-    const {
-      data: groupData,
-      error: groupError,
-    } = await supabase
-      .from("code_groups")
-      .select("id")
-      .eq("company_id", companyId);
-
     if (groupError) {
       setError(groupError.message);
       return;
     }
 
-    const groupIds =
-      (groupData ?? []).map(
-        (group) => group.id
-      );
+    const groups = groupData ?? [];
+    setGroups(groups);
+
+    const groupIds = groups.map((group) => group.id);
 
     if (groupIds.length === 0) {
       setCodes([]);
       return;
     }
 
-    const { data, error } = await supabase
+    const { data: codesData, error: codesError } = await supabase
       .from("codes")
       .select(
         "id, code, group_id, destination_url, active, created_at, qr_png_path"
@@ -377,13 +351,12 @@ export default function CompanyPage() {
         ascending: true,
       });
 
-    if (error) {
-      setError(error.message);
+    if (codesError) {
+      setError(codesError.message);
       return;
     }
 
-    setCodes(data ?? []);
-
+    setCodes(codesData ?? []);
   }
 
   /*
@@ -531,8 +504,7 @@ export default function CompanyPage() {
 
     const loadRequests = [
       loadCompany(),
-      loadGroups(),
-      loadCodes(),
+      loadGroupsAndCodes(),
       loadScheduleAssignments(),
       loadScanCounts(),
       loadEditMode(),
@@ -666,7 +638,7 @@ export default function CompanyPage() {
       setGroupName("");
       setGroupDescription("");
       setShowGroupForm(false);
-      await loadGroups();
+      await loadGroupsAndCodes();
     } catch {
       setError("No se pudo conectar con el servidor.");
     } finally {
@@ -798,7 +770,7 @@ export default function CompanyPage() {
         next.delete(group.id);
         return next;
       });
-      await Promise.all([loadGroups(), loadCodes(), loadScanCounts()]);
+      await Promise.all([loadGroupsAndCodes(), loadScanCounts()]);
     } catch {
       setError("No se pudo conectar con el servidor.");
     } finally {
@@ -890,7 +862,7 @@ export default function CompanyPage() {
         setCodeQuantity(10);
         setError("");
 
-        await loadCodes();
+        await loadGroupsAndCodes();
         await loadScanCounts();
       }
     } catch {
@@ -945,7 +917,7 @@ export default function CompanyPage() {
       setReassignmentCompanyId("");
       setReassignmentGroupId("");
 
-      await loadCodes();
+      await loadGroupsAndCodes();
     }
 
     setSavingEdit(false);
@@ -984,7 +956,7 @@ export default function CompanyPage() {
       setEditingCodeId(null);
       setReassignmentCompanyId("");
       setReassignmentGroupId("");
-      await Promise.all([loadCodes(), loadScanCounts()]);
+      await Promise.all([loadGroupsAndCodes(), loadScanCounts()]);
     } catch {
       setError("No se pudo conectar con el servidor.");
     } finally {
@@ -1036,7 +1008,7 @@ export default function CompanyPage() {
       setCodeToDelete(null);
       setDeleteCodePassword("");
 
-      await Promise.all([loadCodes(), loadScanCounts()]);
+      await Promise.all([loadGroupsAndCodes(), loadScanCounts()]);
     } catch {
       setError("No se pudo conectar con el servidor.");
     } finally {
@@ -1328,7 +1300,7 @@ export default function CompanyPage() {
             <GoogleReviewsDestinationTool
               companyId={companyId}
               codes={codes}
-              onCodesUpdated={() => void loadCodes()}
+              onCodesUpdated={() => void loadGroupsAndCodes()}
               onOpenChange={handleGoogleDestinationOpen}
             />
           </div>

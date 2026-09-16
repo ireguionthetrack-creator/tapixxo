@@ -1,11 +1,4 @@
-"use client";
-
-import { createElement, useEffect, type ReactNode } from "react";
-
-const SOURCES = [
-  "/vendor/srdavo-liquid-glass/displacement-utils.js",
-  "/vendor/srdavo-liquid-glass/glass-element.js",
-] as const;
+import type { CSSProperties, ReactNode } from "react";
 
 type LiquidGlassProps = {
   children: ReactNode;
@@ -18,32 +11,11 @@ type LiquidGlassProps = {
   interactive?: boolean;
 };
 
-function loadScript(source: string) {
-  return new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${source}"]`);
-
-    if (existing) {
-      if (existing.dataset.ready === "true") resolve();
-      else {
-        existing.addEventListener("load", () => resolve(), { once: true });
-        existing.addEventListener("error", () => reject(new Error(`Unable to load ${source}`)), { once: true });
-      }
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = source;
-    script.async = false;
-    script.addEventListener("load", () => {
-      script.dataset.ready = "true";
-      resolve();
-    }, { once: true });
-    script.addEventListener("error", () => reject(new Error(`Unable to load ${source}`)), { once: true });
-    document.head.appendChild(script);
-  });
-}
-
-/** Local integration of srdavo/liquid-glass, loaded dependency-first. */
+/**
+ * A CSS glass surface intentionally renders on the server. The previous SVG
+ * displacement implementation created a ResizeObserver and expensive filter
+ * for every decorative panel, which made the landing jank on mobile.
+ */
 export function LiquidGlass({
   children,
   className,
@@ -54,31 +26,20 @@ export function LiquidGlass({
   backgroundColor,
   interactive = true,
 }: LiquidGlassProps) {
-  useEffect(() => {
-    if (window.customElements.get("glass-element")) return;
+  const style = {
+    "--tapixxo-glass-background": backgroundColor,
+    "--tapixxo-glass-radius": `${radius}px`,
+    "--tapixxo-glass-blur": `${Math.max(blur, 1)}px`,
+    "--tapixxo-glass-depth": `${depth}px`,
+    "--tapixxo-glass-strength": strength,
+  } as CSSProperties;
 
-    void (async () => {
-      try {
-        for (const source of SOURCES) await loadScript(source);
-      } catch {
-        // Before the component is upgraded, semantic links and controls stay usable.
-      }
-    })();
-  }, []);
-
-  return createElement(
-    "glass-element",
-    {
-      className,
-      "auto-size": "",
-      radius,
-      depth,
-      blur,
-      strength,
-      "chromatic-aberration": 0,
-      "background-color": backgroundColor,
-      interactive: interactive ? "" : undefined,
-    },
-    children,
+  return (
+    <div
+      className={`tapixxo-liquid-glass${interactive ? " tapixxo-liquid-glass-interactive" : ""} ${className}`}
+      style={style}
+    >
+      {children}
+    </div>
   );
 }
