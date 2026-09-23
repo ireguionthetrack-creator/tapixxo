@@ -13,6 +13,7 @@ function isTexasMenuHost(request: NextRequest) {
 function isTexasMenuPath(pathname: string) {
   return pathname === "/" ||
     pathname === "/texasrestobar" ||
+    pathname === "/texasrestobar/icon.png" ||
     pathname === "/menu/texasrestobar" ||
     pathname === "/menu/texasrestobar/icon.png" ||
     pathname === "/waiter/texasrestobar" ||
