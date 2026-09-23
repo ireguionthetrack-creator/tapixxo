@@ -36,7 +36,14 @@ export function proxy(request: NextRequest) {
   // pero solo expone el multilink, menú, placas y panel de meseros. La edición
   // continúa viviendo exclusivamente en el dominio principal de Tapixxo.
   if (isTexasMenuHost(request)) {
-    if (pathname === "/") return NextResponse.rewrite(new URL("/menu/texasrestobar", request.url));
+    if (pathname === "/") {
+      const menuUrl = new URL("/menu/texasrestobar", request.url);
+      // La placa llega como ?plate=T1001. La reescritura a la implementación
+      // interna no puede perderlo o el menú no sabrá que debe mostrar el botón
+      // para llamar al mesero.
+      menuUrl.search = request.nextUrl.search;
+      return NextResponse.rewrite(menuUrl);
+    }
     if (pathname === "/waiter") return NextResponse.rewrite(new URL("/waiter/texasrestobar", request.url));
     if (!isTexasMenuPath(pathname)) {
       if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Ruta no disponible en este subdominio." }, { status: 404 });

@@ -18,10 +18,21 @@ type ResolvedCodeDestination = {
   destination_source: string | null;
 };
 
+const TEXAS_MENU_HOST = "texasrestobar.tapixxo.com";
+
+function isTexasMenuDestination(destination: URL) {
+  const host = destination.hostname.toLowerCase();
+  const isTexasSubdomainRoot = host === TEXAS_MENU_HOST && destination.pathname === "/";
+
+  // Conservamos la ruta histórica para enlaces locales y enlaces ya publicados
+  // antes de que el menú pasara a ser la portada del subdominio.
+  return isTexasSubdomainRoot || destination.pathname === "/menu/texasrestobar";
+}
+
 function destinationWithTexasTableMarker(destinationUrl: string, requestUrl: string, code: string) {
   try {
     const destination = new URL(destinationUrl, requestUrl);
-    if (destination.pathname === "/menu/texasrestobar") {
+    if (isTexasMenuDestination(destination)) {
       destination.searchParams.set("plate", code);
     }
     return destination.toString();

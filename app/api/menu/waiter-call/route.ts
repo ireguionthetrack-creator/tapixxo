@@ -4,6 +4,7 @@ import { sendTexasWaiterPush } from "@/lib/waiter-panel/web-push";
 
 const PLATE_PATTERN = /^[A-Za-z]+[1-9]\d*$/;
 const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TEXAS_MENU_HOST = "texasrestobar.tapixxo.com";
 
 type ResolvedCodeDestination = {
   code_id: string;
@@ -24,7 +25,16 @@ function tableLabelForTexasCode(code: string) {
 
 function isTexasMenuDestination(destinationUrl: string, requestUrl: string) {
   try {
-    return new URL(destinationUrl, requestUrl).pathname === "/menu/texasrestobar";
+    const destination = new URL(destinationUrl, requestUrl);
+    const requestOrigin = new URL(requestUrl).origin;
+    const isLegacyMenuPath = destination.pathname === "/menu/texasrestobar";
+    const isTexasSubdomainRoot =
+      destination.hostname.toLowerCase() === TEXAS_MENU_HOST && destination.pathname === "/";
+
+    // La llamada debe salir desde el mismo menú al que la placa redirige. Así
+    // admitimos la portada del subdominio y la ruta histórica sin abrir este
+    // endpoint a destinos externos que usen una ruta parecida.
+    return destination.origin === requestOrigin && (isLegacyMenuPath || isTexasSubdomainRoot);
   } catch {
     return false;
   }
