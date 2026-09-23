@@ -3,7 +3,13 @@ import { redirect } from "next/navigation";
 import { TexasWaiterPanel } from "@/lib/waiter-panel/texas-waiter-panel";
 import { getTexasWaiterPanelAccess } from "@/lib/waiter-panel/texas-access";
 
-export const metadata: Metadata = { title: "Texas Resto Bar | Panel de meseros", robots: { index: false, follow: false } };
+export const metadata: Metadata = {
+  title: "Texas Resto Bar | Panel de meseros",
+  robots: { index: false, follow: false },
+  icons: {
+    icon: [{ url: "/waiter/texasrestobar/icon.png", type: "image/png" }],
+  },
+};
 export const dynamic = "force-dynamic";
 
 export default async function TexasWaiterPage() {

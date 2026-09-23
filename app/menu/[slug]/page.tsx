@@ -8,7 +8,13 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: PageProps<"/menu/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   if (slug !== "texasrestobar") return {};
-  return { title: "Texas Resto Bar | Menú Digital", description: "Menú digital de Texas Resto Bar" };
+  return {
+    title: "Texas Resto Bar | Menú Digital",
+    description: "Menú digital de Texas Resto Bar",
+    icons: {
+      icon: [{ url: "/menu/texasrestobar/icon.png", type: "image/png" }],
+    },
+  };
 }
 
 export default async function PublicMenuPage({ params, searchParams }: PageProps<"/menu/[slug]">) {
