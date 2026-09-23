@@ -4,9 +4,37 @@ import type { NextRequest } from "next/server";
 const DISABLED_API_PATHS = new Set([
   "/api/payments/wompi/checkout",
 ]);
+const TEXAS_MENU_HOST = "texasrestobar.tapixxo.com";
+
+function isTexasMenuHost(request: NextRequest) {
+  return (request.headers.get("host") ?? "").toLowerCase().split(":")[0] === TEXAS_MENU_HOST;
+}
+
+function isTexasMenuPath(pathname: string) {
+  return pathname === "/" ||
+    pathname === "/texasrestobar" ||
+    pathname === "/menu/texasrestobar" ||
+    pathname === "/waiter/texasrestobar" ||
+    pathname === "/login" ||
+    pathname.startsWith("/auth/") ||
+    pathname.startsWith("/t/") ||
+    pathname === "/api/menu/waiter-call" ||
+    pathname.startsWith("/api/waiter/texasrestobar/");
+}
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // El subdominio público de Texas comparte la aplicación por eficiencia,
+  // pero solo expone el multilink, menú, placas y panel de meseros. La edición
+  // continúa viviendo exclusivamente en el dominio principal de Tapixxo.
+  if (isTexasMenuHost(request)) {
+    if (pathname === "/") return NextResponse.rewrite(new URL("/texasrestobar", request.url));
+    if (!isTexasMenuPath(pathname)) {
+      if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Ruta no disponible en este subdominio." }, { status: 404 });
+      return NextResponse.redirect(new URL("/texasrestobar", request.url));
+    }
+  }
 
   if (
     pathname === "/api/store" ||
@@ -39,10 +67,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/store/:path*",
-    "/api/store/:path*",
-    "/api/payments/wompi/checkout",
-    "/admin/stock/:path*",
-    "/api/admin/stock/:path*",
+    "/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|menu-assets/).*)",
   ],
 };

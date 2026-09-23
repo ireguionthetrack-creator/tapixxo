@@ -18,6 +18,18 @@ type ResolvedCodeDestination = {
   destination_source: string | null;
 };
 
+function destinationWithTexasTableMarker(destinationUrl: string, requestUrl: string, code: string) {
+  try {
+    const destination = new URL(destinationUrl, requestUrl);
+    if (destination.pathname === "/menu/texasrestobar") {
+      destination.searchParams.set("plate", code);
+    }
+    return destination.toString();
+  } catch {
+    return destinationUrl;
+  }
+}
+
 async function getSignedInUserId() {
   const cookieStore = await cookies();
   const supabaseAuth = createServerClient(
@@ -153,5 +165,7 @@ export async function GET(
     await supabase.from("code_scans").insert({ code_id: resolved.code_id });
   }
 
-  return NextResponse.redirect(resolved.destination_url);
+  return NextResponse.redirect(
+    destinationWithTexasTableMarker(resolved.destination_url, request.url, resolved.code)
+  );
 }

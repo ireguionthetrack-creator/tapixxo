@@ -17,12 +17,14 @@ import { LiquidLoader } from "@/app/components/liquid-loader";
 import { GoogleReviewsDestinationTool } from "@/app/components/google-reviews-destination-tool";
 import { CodeScheduleDestinationTool } from "@/app/components/code-schedule-destination-tool";
 import { ChangePasswordControl } from "@/app/components/change-password-control";
+import { DigitalMenuAdminCard } from "@/app/components/digital-menu-admin-card";
 
 type Company = {
   id: string;
   name: string;
   created_at: string;
   profile_image_path: string | null;
+  menu_digital_enabled: boolean;
 };
 
 type Group = {
@@ -187,6 +189,7 @@ export default function CompanyPage() {
 
   const [editModeEnabled, setEditModeEnabled] = useState(false);
   const [updatingEditMode, setUpdatingEditMode] = useState(false);
+  const [digitalMenuEditable, setDigitalMenuEditable] = useState(false);
 
   const [codeToDelete, setCodeToDelete] = useState<Code | null>(null);
   const [deleteCodePassword, setDeleteCodePassword] = useState("");
@@ -280,7 +283,7 @@ export default function CompanyPage() {
   async function loadCompany() {
     const { data, error } = await supabase
       .from("companies")
-      .select("id, name, created_at, profile_image_path")
+      .select("id, name, created_at, profile_image_path, menu_digital_enabled")
       .eq("id", companyId)
       .single();
 
@@ -297,6 +300,7 @@ export default function CompanyPage() {
           setCompany({
             ...fallbackCompany,
             profile_image_path: null,
+            menu_digital_enabled: false,
           });
           return;
         }
@@ -416,6 +420,16 @@ export default function CompanyPage() {
     }
   }
 
+  async function loadDigitalMenuAccess() {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/digital-menu`, { cache: "no-store" });
+      const result = await response.json();
+      setDigitalMenuEditable(response.ok && Boolean(result.menu));
+    } catch {
+      setDigitalMenuEditable(false);
+    }
+  }
+
   async function toggleEditMode() {
     const nextEnabled = !editModeEnabled;
     setUpdatingEditMode(true);
@@ -508,6 +522,7 @@ export default function CompanyPage() {
       loadScheduleAssignments(),
       loadScanCounts(),
       loadEditMode(),
+      loadDigitalMenuAccess(),
     ];
 
     if (accessRole === "admin") {
@@ -1172,6 +1187,7 @@ export default function CompanyPage() {
                   {updatingEditMode ? "Actualizando..." : editModeEnabled ? "Modo edición activo" : "Activar modo edición"}
                 </button>
                 <div className="mt-2 grid grid-cols-2 gap-2">
+                  {role === "company" && (digitalMenuEditable || company?.menu_digital_enabled) && <Link href={`/companies/${companyId}/digital-menu`} className="flex min-h-12 items-center justify-center rounded-xl border border-orange-300/35 bg-orange-400/10 px-3 text-center text-sm font-semibold text-orange-100 transition hover:bg-orange-400/20">Menú digital</Link>}
                   <Link href={`/companies/${companyId}/stats`} className="flex min-h-12 items-center justify-center rounded-xl bg-orange-400 px-3 text-center text-sm font-semibold text-black shadow-[0_8px_20px_rgba(255,122,26,0.22)] transition hover:bg-orange-300">
                     Ver estadísticas
                   </Link>
@@ -1226,6 +1242,7 @@ export default function CompanyPage() {
                   ? "Modo edición activo"
               : "Activar modo edición"}
             </button>
+            {role === "company" && (digitalMenuEditable || company?.menu_digital_enabled) && <Link href={`/companies/${companyId}/digital-menu`} className="inline-flex w-fit items-center rounded-xl border border-orange-300/35 bg-orange-400/10 px-4 py-2.5 text-sm font-semibold text-orange-100 transition hover:bg-orange-400/20">Menú digital</Link>}
             <Link
               href={`/companies/${companyId}/stats`}
               className="inline-flex w-fit items-center rounded-xl bg-orange-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-orange-300 hover:shadow-[0_0_24px_rgba(255,122,26,0.28)]"
@@ -1252,6 +1269,8 @@ export default function CompanyPage() {
         </div>
 
       </header>
+
+      {role === "admin" && <DigitalMenuAdminCard companyId={companyId} />}
 
       {avatarMenuOpen && (
         <div
