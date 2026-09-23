@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./texas-waiter-panel.module.css";
 
@@ -169,8 +170,19 @@ export function TexasWaiterPanel() {
 
   return <main className={styles.page}>
     <header className={styles.header}>
-      <div><p>Texas Resto Bar</p><h1>Panel de meseros</h1><span>{pendingRequests.length} llamada{pendingRequests.length === 1 ? "" : "s"} pendiente{pendingRequests.length === 1 ? "" : "s"}</span></div>
-      <button type="button" className={`${styles.bell} ${notificationsEnabled ? styles.bellActive : ""}`} onClick={() => void toggleNotifications()} aria-pressed={notificationsEnabled} aria-label={notificationsEnabled ? "Silenciar alertas del turno" : "Activar alertas del turno"} title={notificationsEnabled ? "Silenciar alertas del turno" : "Activar alertas del turno"}><BellIcon /><span>{notificationsEnabled ? "Alertas activas" : "Alertas silenciadas"}</span></button>
+      <Image
+        className={styles.brandLogo}
+        src={TEXAS_LOGO}
+        alt="Texas Resto Bar"
+        width={192}
+        height={128}
+        priority
+        sizes="(max-width: 480px) 8.5rem, 10rem"
+      />
+      <div className={styles.headerDetails}>
+        <div><p>Texas Resto Bar</p><h1>Panel de meseros</h1><span>{pendingRequests.length} llamada{pendingRequests.length === 1 ? "" : "s"} pendiente{pendingRequests.length === 1 ? "" : "s"}</span></div>
+        <button type="button" className={`${styles.bell} ${notificationsEnabled ? styles.bellActive : ""}`} onClick={() => void toggleNotifications()} aria-pressed={notificationsEnabled} aria-label={notificationsEnabled ? "Silenciar alertas del turno" : "Activar alertas del turno"} title={notificationsEnabled ? "Silenciar alertas del turno" : "Activar alertas del turno"}><BellIcon /><span>{notificationsEnabled ? "Alertas activas" : "Alertas silenciadas"}</span></button>
+      </div>
     </header>
 
     {error && <p className={styles.error} role="alert">{error}</p>}

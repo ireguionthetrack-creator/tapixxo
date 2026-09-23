@@ -27,6 +27,31 @@ function checkoutReturnPath() {
   }
 }
 
+function texasWaiterReturnPath() {
+  const requested = new URLSearchParams(window.location.search).get("next");
+  if (!requested) return null;
+
+  try {
+    const target = new URL(requested, window.location.origin);
+    if (
+      target.origin !== window.location.origin ||
+      target.pathname !== "/waiter/texasrestobar" ||
+      target.search ||
+      target.hash
+    ) {
+      return null;
+    }
+
+    return target.pathname;
+  } catch {
+    return null;
+  }
+}
+
+function isTexasWaiterAccount(user: { app_metadata?: Record<string, unknown> | null }) {
+  return user.app_metadata?.role === "texas_waiter" && user.app_metadata?.menu_slug === "texasrestobar";
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,6 +61,11 @@ export default function LoginPage() {
 
   const router = useRouter();
   const supabase = createClient();
+
+  function redirectTexasWaiter() {
+    router.replace(texasWaiterReturnPath() ?? "/waiter/texasrestobar");
+    router.refresh();
+  }
 
   function redirectForProfile(profile: { role: string; company_id: string | null }) {
     if (profile.role === "admin") {
@@ -61,6 +91,11 @@ export default function LoginPage() {
 
       if (!user) {
         setCheckingSession(false);
+        return;
+      }
+
+      if (isTexasWaiterAccount(user)) {
+        redirectTexasWaiter();
         return;
       }
 
@@ -100,6 +135,11 @@ export default function LoginPage() {
         "Correo o contraseña incorrectos."
       );
       setLoading(false);
+      return;
+    }
+
+    if (isTexasWaiterAccount(data.user)) {
+      redirectTexasWaiter();
       return;
     }
 

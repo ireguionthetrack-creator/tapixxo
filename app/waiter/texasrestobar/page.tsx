@@ -8,6 +8,6 @@ export const dynamic = "force-dynamic";
 
 export default async function TexasWaiterPage() {
   const access = await getTexasWaiterPanelAccess();
-  if (!access) redirect("/login");
+  if (!access) redirect("/login?next=/waiter/texasrestobar");
   return <TexasWaiterPanel />;
 }
