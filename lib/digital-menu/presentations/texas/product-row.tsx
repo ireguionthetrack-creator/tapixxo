@@ -35,7 +35,7 @@ export function TexasProductRow({ product, language, showCurrency, isFavorite, i
   return <>
     <article className={`${styles.product} ${!product.available ? styles.soldOut : ""} ${isRemovingFromFavorites ? styles.productFavoriteRemoving : ""}`}>
       <button type="button" className={styles.productTrigger} onClick={() => setIsDetailsOpen(true)} aria-expanded={isDetailsOpen} aria-controls={detailsId} aria-label={`${copy.details} ${product.name}`}>
-        {product.imageUrl && <span className={styles.productImageFrame}><Image className={styles.productImage} src={product.imageUrl} alt="" fill sizes="80px" unoptimized /></span>}
+        {product.imageUrl && <span className={styles.productImageFrame}><Image className={styles.productImage} src={product.imageUrl} alt="" fill sizes="80px" quality={60} /></span>}
         <span className={styles.productContent}>
           <span className={styles.productLine}>
             <span className={styles.productName}>{product.name}</span>
@@ -55,7 +55,7 @@ export function TexasProductRow({ product, language, showCurrency, isFavorite, i
         <button type="button" disabled={isRemovingFromFavorites} className={`${styles.productDetailsFavorite} ${isFavorite ? styles.productDetailsFavoriteActive : ""}`} aria-label={isFavorite ? `${copy.removeFavorite}: ${product.name}` : `${copy.addFavorite}: ${product.name}`} aria-pressed={isFavorite} onClick={() => onToggleFavorite(product.id)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.85 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.07-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.85-8.84a5.5 5.5 0 0 0 0-7.78Z" /></svg>
         </button>
-        {product.imageUrl && <div className={styles.productDetailsImageFrame}><Image src={product.imageUrl} alt={product.name} fill sizes="(max-width: 640px) 100vw, 38rem" className={styles.productDetailsImage} unoptimized priority /></div>}
+        {product.imageUrl && <div className={styles.productDetailsImageFrame}><Image src={product.imageUrl} alt={product.name} fill sizes="(max-width: 640px) 100vw, 38rem" quality={75} className={styles.productDetailsImage} priority /></div>}
         <div className={styles.productDetailsContent}>
           <p className={styles.productDetailsEyebrow}>{copy.brand}</p>
           <h2 id={`${detailsId}-title`}>{product.name}</h2>

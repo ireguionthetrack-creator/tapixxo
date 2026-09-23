@@ -1,5 +1,6 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type PublicMenuTranslation = Record<string, { name?: string; description?: string }>;
@@ -53,7 +54,7 @@ function bannerTranslations(value: unknown): PublicMenuBannerTranslation {
   }, {});
 }
 
-export async function getPublicDigitalMenuBySlug(slug: string): Promise<PublicDigitalMenu | null> {
+async function getUncachedPublicDigitalMenuBySlug(slug: string): Promise<PublicDigitalMenu | null> {
   const admin = createAdminClient();
   const menuResult = await admin
     .from("digital_menus")
@@ -106,4 +107,17 @@ export async function getPublicDigitalMenuBySlug(slug: string): Promise<PublicDi
     }),
     banners: (bannerResult.data ?? []).map((banner) => ({ id: banner.id, imageUrl: banner.image_url, eyebrow: banner.eyebrow ?? "", title: banner.title ?? "", description: banner.description ?? "", translations: bannerTranslations(banner.translations), showOverlay: banner.show_overlay, sortOrder: banner.sort_order })),
   };
+}
+
+// El menú público es el mismo para todos los visitantes. Almacenarlo por un
+// minuto evita varias consultas a Supabase en cada apertura de la carta, sin
+// retrasar de forma perceptible las ediciones realizadas desde Tapixxo.
+const getCachedPublicDigitalMenuBySlug = unstable_cache(
+  getUncachedPublicDigitalMenuBySlug,
+  ["public-digital-menu"],
+  { revalidate: 60, tags: ["public-digital-menu"] },
+);
+
+export async function getPublicDigitalMenuBySlug(slug: string): Promise<PublicDigitalMenu | null> {
+  return getCachedPublicDigitalMenuBySlug(slug);
 }

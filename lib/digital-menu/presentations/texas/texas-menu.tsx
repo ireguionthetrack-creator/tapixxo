@@ -64,10 +64,6 @@ function categoryAssetKey(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").replace(/&/g, "y").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-function isRemoteImage(source: string) {
-  return source.startsWith("http://") || source.startsWith("https://");
-}
-
 function favoriteIdsFromSessionCookie() {
   const cookie = document.cookie.split("; ").find((entry) => entry.startsWith(`${FAVORITES_COOKIE}=`));
   if (!cookie) return [];
@@ -393,8 +389,14 @@ export function TexasMenu({ menu, plateCode }: { menu: TexasMenuData; plateCode?
     return { id: banner.id, imageUrl: banner.imageUrl, eyebrow: localized?.eyebrow ?? banner.eyebrow, title: localized?.title ?? banner.title, description: localized?.description ?? banner.description, showOverlay: banner.showOverlay };
   }) : TEXAS_PROMOTION_FLYERS, [language, menu.banners]);
 
-  return <>
-  <main inert={isMenuFrontVisible || undefined} aria-hidden={isMenuFrontVisible || undefined} className={`${styles.page} ${usesParchment ? styles.parchmentPage : ""} ${usesMarineMosaic ? styles.marinePage : ""} ${usesPremiumTexture ? styles.premiumPage : ""} ${usesAdditionalTexture ? styles.additionalPage : ""}`}>
+  // La portada es la primera vista. No montamos el menú completo hasta que se
+  // solicite, así evitamos descargar o pintar decenas de imágenes que todavía
+  // no son visibles en un móvil.
+  if (isMenuFrontVisible) {
+    return <TexasMultiLink onViewMenu={enterMenu} enabledLanguages={menu.enabledLanguages.filter(isTexasLanguage)} />;
+  }
+
+  return <main className={`${styles.page} ${usesParchment ? styles.parchmentPage : ""} ${usesMarineMosaic ? styles.marinePage : ""} ${usesPremiumTexture ? styles.premiumPage : ""} ${usesAdditionalTexture ? styles.additionalPage : ""}`}>
     <div aria-hidden="true" className={`${styles.categoryTransition} ${isCategoryTransitioning ? styles.categoryTransitionActive : ""}`} />
     <header ref={headerRef} className={styles.header}>
       <div className={styles.headerLeading}>
@@ -430,7 +432,7 @@ export function TexasMenu({ menu, plateCode }: { menu: TexasMenuData; plateCode?
 
     <nav className={styles.categoryNav} aria-label={copy.quickCategories}>
       <div ref={categoryScrollerRef} className={styles.categoryScroller}>
-        {organizedCategories.map((category) => {
+        {organizedCategories.map((category, index) => {
           const imageSource = bubbleImageForCategory(category);
           return <button ref={(element) => {
             if (element) categoryButtonRefs.current.set(category.id, element);
@@ -438,7 +440,7 @@ export function TexasMenu({ menu, plateCode }: { menu: TexasMenuData; plateCode?
           }} key={category.id} type="button" onClick={() => selectCategory(category.id)} aria-pressed={categoryId === category.id} className={categoryId === category.id ? styles.categoryActive : ""}>
             <span className={styles.categoryImageFrame}>
               <span className={styles.categoryImageMask}>
-                <Image src={imageSource} alt="" fill sizes="76px" className={styles.categoryImage} loading="eager" unoptimized={isRemoteImage(imageSource)} />
+              <Image src={imageSource} alt="" fill sizes="76px" quality={60} className={styles.categoryImage} loading={index < 4 ? "eager" : "lazy"} fetchPriority={index < 2 ? "high" : "auto"} />
               </span>
             </span>
             <span>{localizedCategoryName(category, language)}</span>
@@ -455,7 +457,7 @@ export function TexasMenu({ menu, plateCode }: { menu: TexasMenuData; plateCode?
             const imageSource = cardImageForCategory(category);
             return <button type="button" key={category.id} onClick={() => selectCategory(category.id)} className={styles.categoryCard}>
               <span className={styles.categoryCardImage}>
-                <Image src={imageSource} alt="" fill sizes="(max-width: 700px) 50vw, 18rem" className={styles.categoryImage} unoptimized={isRemoteImage(imageSource)} />
+            <Image src={imageSource} alt="" fill sizes="(max-width: 700px) 50vw, 18rem" quality={70} className={styles.categoryImage} />
               </span>
               {language !== "es" && <><span className={styles.categoryCardShade} /><span className={styles.categoryCardLabel}>{localizedCategoryName(category, language)}</span></>}
               <span className={styles.categoryArrow} aria-hidden="true">→</span>
@@ -504,7 +506,5 @@ export function TexasMenu({ menu, plateCode }: { menu: TexasMenuData; plateCode?
         <span>{waiterCallState === "submitting" ? copy.openingWaiterWhatsApp : waiterCallState === "pending" ? copy.waiterRequestReady : waiterCallState === "error" ? copy.waiterRequestError : copy.callWaiter}</span>
       </button>}
     </div>}
-  </main>
-  {isMenuFrontVisible && <TexasMultiLink onViewMenu={enterMenu} enabledLanguages={menu.enabledLanguages.filter(isTexasLanguage)} />}
-  </>;
+  </main>;
 }

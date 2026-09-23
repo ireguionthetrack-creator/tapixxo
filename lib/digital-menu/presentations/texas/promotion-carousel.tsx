@@ -13,10 +13,6 @@ export type TexasPromotionFlyer = {
   showOverlay?: boolean;
 };
 
-function isRemoteImage(source: string) {
-  return source.startsWith("http://") || source.startsWith("https://");
-}
-
 export function TexasPromotionCarousel({ flyers, autoplaySeconds = 8 }: { flyers: readonly TexasPromotionFlyer[]; autoplaySeconds?: number }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -43,7 +39,7 @@ export function TexasPromotionCarousel({ flyers, autoplaySeconds = 8 }: { flyers
     <div className={styles.promotionViewport} aria-roledescription="carrusel" aria-label={`Promociones, ${flyers.length} ${flyers.length === 1 ? "flyer" : "flyers"}`} onTouchStart={(event) => setTouchStart(event.touches[0]?.clientX ?? null)} onTouchEnd={(event) => handleTouchEnd(event.changedTouches[0]?.clientX ?? 0)}>
       <div className={styles.promotionTrack} style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
         {flyers.map((flyer, index) => <article className={styles.promotionSlide} key={flyer.id} aria-hidden={activeIndex !== index}>
-          <Image src={flyer.imageUrl} alt="" fill sizes="(max-width: 700px) 100vw, 58rem" className={styles.promotionImage} unoptimized={isRemoteImage(flyer.imageUrl)} />
+          <Image src={flyer.imageUrl} alt="" fill sizes="(max-width: 700px) 100vw, 58rem" quality={70} className={styles.promotionImage} loading={index === activeIndex ? "eager" : "lazy"} />
           {flyer.showOverlay !== false && <><div className={styles.promotionShade} /><div className={styles.promotionCopy}><p>{flyer.eyebrow}</p><h2>{flyer.title}</h2><span>{flyer.description}</span></div></>}
         </article>)}
       </div>
