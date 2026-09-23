@@ -15,6 +15,7 @@ type ServiceRequest = {
 
 const REQUESTS_ENDPOINT = "/api/waiter/texasrestobar/requests";
 const PUSH_SUBSCRIPTION_ENDPOINT = "/api/waiter/texasrestobar/push-subscription";
+const TEST_PUSH_ENDPOINT = "/api/waiter/texasrestobar/test-push";
 const NOTIFICATION_STORAGE_KEY = "tapixxo_texas_waiter_notifications";
 const TEXAS_LOGO = "/menu-assets/texas-logo.png";
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_TEXAS_WAITER_VAPID_PUBLIC_KEY;
@@ -60,6 +61,7 @@ export function TexasWaiterPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [isTestingNotification, setIsTestingNotification] = useState(false);
   const [needsHomeScreenInstallation, setNeedsHomeScreenInstallation] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
     if (typeof window === "undefined" || typeof Notification === "undefined") return false;
@@ -247,6 +249,21 @@ export function TexasWaiterPanel() {
     }
   };
 
+  const testNotification = async () => {
+    if (isTestingNotification) return;
+    setIsTestingNotification(true);
+    try {
+      const response = await fetch(TEST_PUSH_ENDPOINT, { method: "POST" });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "No se pudo enviar la alerta de prueba.");
+      setError("Alerta de prueba enviada. Revisa la notificación del teléfono.");
+    } catch (testError) {
+      setError(testError instanceof Error ? testError.message : "No se pudo enviar la alerta de prueba.");
+    } finally {
+      setIsTestingNotification(false);
+    }
+  };
+
   const pendingRequests = requests.filter((request) => request.status === "pending");
   const resolvedRequests = requests.filter((request) => request.status === "resolved");
 
@@ -263,7 +280,10 @@ export function TexasWaiterPanel() {
       />
       <div className={styles.headerDetails}>
         <div><p>Texas Resto Bar</p><h1>Panel de meseros</h1><span>{pendingRequests.length} llamada{pendingRequests.length === 1 ? "" : "s"} pendiente{pendingRequests.length === 1 ? "" : "s"}</span></div>
-        <button type="button" className={`${styles.bell} ${notificationsEnabled ? styles.bellActive : ""}`} onClick={() => void toggleNotifications()} aria-pressed={notificationsEnabled} aria-label={notificationsEnabled ? "Silenciar alertas del turno" : "Activar alertas del turno"} title={notificationsEnabled ? "Silenciar alertas del turno" : "Activar alertas del turno"}><BellIcon /><span>{notificationsEnabled ? "Alertas activas" : "Alertas silenciadas"}</span></button>
+        <div className={styles.notificationControls}>
+          <button type="button" className={`${styles.bell} ${notificationsEnabled ? styles.bellActive : ""}`} onClick={() => void toggleNotifications()} aria-pressed={notificationsEnabled} aria-label={notificationsEnabled ? "Silenciar alertas del turno" : "Activar alertas del turno"} title={notificationsEnabled ? "Silenciar alertas del turno" : "Activar alertas del turno"}><BellIcon /><span>{notificationsEnabled ? "Alertas activas" : "Alertas silenciadas"}</span></button>
+          {notificationsEnabled && <button type="button" className={styles.testButton} onClick={() => void testNotification()} disabled={isTestingNotification}>{isTestingNotification ? "Enviando…" : "Probar alerta"}</button>}
+        </div>
       </div>
     </header>
 
