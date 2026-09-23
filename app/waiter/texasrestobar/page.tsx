@@ -6,6 +6,13 @@ import { getTexasWaiterPanelAccess } from "@/lib/waiter-panel/texas-access";
 export const metadata: Metadata = {
   title: "Texas Resto Bar | Panel de meseros",
   robots: { index: false, follow: false },
+  manifest: "/texas-waiter.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Texas Meseros",
+    statusBarStyle: "black-translucent",
+  },
+  themeColor: "#0c171d",
   icons: {
     icon: [{ url: "/waiter/texasrestobar/icon.png", type: "image/png" }],
   },

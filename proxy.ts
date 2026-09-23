@@ -16,12 +16,16 @@ function isTexasMenuPath(pathname: string) {
     pathname === "/texasrestobar/icon.png" ||
     pathname === "/menu/texasrestobar" ||
     pathname === "/menu/texasrestobar/icon.png" ||
+    pathname === "/waiter" ||
     pathname === "/waiter/texasrestobar" ||
     pathname === "/waiter/texasrestobar/icon.png" ||
+    pathname === "/waiter-sw.js" ||
+    pathname === "/texas-waiter.webmanifest" ||
     pathname === "/login" ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/t/") ||
     pathname === "/api/menu/waiter-call" ||
+    pathname === "/api/waiter/texasrestobar/push-subscription" ||
     pathname.startsWith("/api/waiter/texasrestobar/");
 }
 
@@ -32,7 +36,8 @@ export function proxy(request: NextRequest) {
   // pero solo expone el multilink, menú, placas y panel de meseros. La edición
   // continúa viviendo exclusivamente en el dominio principal de Tapixxo.
   if (isTexasMenuHost(request)) {
-    if (pathname === "/") return NextResponse.rewrite(new URL("/texasrestobar", request.url));
+    if (pathname === "/") return NextResponse.rewrite(new URL("/menu/texasrestobar", request.url));
+    if (pathname === "/waiter") return NextResponse.rewrite(new URL("/waiter/texasrestobar", request.url));
     if (!isTexasMenuPath(pathname)) {
       if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Ruta no disponible en este subdominio." }, { status: 404 });
       return NextResponse.redirect(new URL("/texasrestobar", request.url));

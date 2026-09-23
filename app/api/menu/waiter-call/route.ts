@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendTexasWaiterPush } from "@/lib/waiter-panel/web-push";
 
 const PLATE_PATTERN = /^[A-Za-z]+[1-9]\d*$/;
 const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -108,6 +109,14 @@ export async function POST(request: NextRequest) {
     if (serviceRequestError || !serviceRequest) {
       return NextResponse.json({ error: "El servicio de meseros no está disponible." }, { status: 503 });
     }
+
+    // Las alertas push nunca bloquean la confirmación de la mesa. Si un teléfono
+    // dejó de ser válido, el emisor lo desactiva silenciosamente.
+    await sendTexasWaiterPush({
+      companyId: resolved.company_id,
+      requestId: serviceRequest.id,
+      tableLabel,
+    });
 
     const response = statusResponse("pending", tableLabel);
     response.cookies.set({ name: cookieName, value: serviceRequest.id, httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 12, path: "/api/menu/waiter-call" });

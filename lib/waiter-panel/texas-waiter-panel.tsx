@@ -14,8 +14,10 @@ type ServiceRequest = {
 };
 
 const REQUESTS_ENDPOINT = "/api/waiter/texasrestobar/requests";
+const PUSH_SUBSCRIPTION_ENDPOINT = "/api/waiter/texasrestobar/push-subscription";
 const NOTIFICATION_STORAGE_KEY = "tapixxo_texas_waiter_notifications";
 const TEXAS_LOGO = "/menu-assets/texas-logo.png";
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_TEXAS_WAITER_VAPID_PUBLIC_KEY;
 
 function BellIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9.5a6 6 0 0 0-12 0c0 7-2.5 7-2.5 8.5h17C20.5 16.5 18 16.5 18 9.5ZM9.5 21h5" /></svg>;
@@ -29,11 +31,36 @@ function formatRequestedAt(value: string) {
   return new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
+function isInstalledWebApp() {
+  const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
+  return window.matchMedia("(display-mode: standalone)").matches || navigatorWithStandalone.standalone === true;
+}
+
+function isIPhoneOrIPad() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+function subscriptionPayload(subscription: PushSubscription) {
+  const keys = subscription.toJSON().keys;
+  return {
+    endpoint: subscription.endpoint,
+    keys: { p256dh: keys?.p256dh ?? "", auth: keys?.auth ?? "" },
+  };
+}
+
+function urlBase64ToUint8Array(value: string) {
+  const padding = "=".repeat((4 - value.length % 4) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from(rawData, (character) => character.charCodeAt(0));
+}
+
 export function TexasWaiterPanel() {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [needsHomeScreenInstallation, setNeedsHomeScreenInstallation] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
     if (typeof window === "undefined" || typeof Notification === "undefined") return false;
     try {
@@ -113,8 +140,41 @@ export function TexasWaiterPanel() {
     alertAudio.current = null;
   }, []);
 
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+
+    let cancelled = false;
+    void navigator.serviceWorker.register("/waiter-sw.js", { scope: "/" }).then(async (registration) => {
+      if (!cancelled && isIPhoneOrIPad() && !isInstalledWebApp()) {
+        setNeedsHomeScreenInstallation(true);
+      }
+      const subscription = await registration.pushManager.getSubscription();
+      if (!cancelled && subscription && Notification.permission === "granted") {
+        setNotificationsEnabled(true);
+      }
+    }).catch(() => {
+      if (!cancelled) setError("No se pudo preparar las notificaciones de este dispositivo.");
+    });
+
+    return () => { cancelled = true; };
+  }, []);
+
   const toggleNotifications = async () => {
     if (notificationsEnabled) {
+      try {
+        const registration = await navigator.serviceWorker?.ready;
+        const subscription = await registration?.pushManager.getSubscription();
+        if (subscription) {
+          await fetch(PUSH_SUBSCRIPTION_ENDPOINT, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(subscriptionPayload(subscription)),
+          });
+          await subscription.unsubscribe();
+        }
+      } catch {
+        // The local switch still silences this browser if it cannot reach the server.
+      }
       setNotificationsEnabled(false);
       try {
         window.localStorage.removeItem(NOTIFICATION_STORAGE_KEY);
@@ -129,6 +189,15 @@ export function TexasWaiterPanel() {
       setError("Este navegador no admite notificaciones.");
       return;
     }
+    if (needsHomeScreenInstallation) {
+      setError("En iPhone, usa Compartir → Añadir a pantalla de inicio y abre Texas Meseros desde ese icono para activar alertas.");
+      return;
+    }
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !VAPID_PUBLIC_KEY) {
+      setError("Las alertas push de este dispositivo aún no están configuradas.");
+      return;
+    }
+
     const permission = await Notification.requestPermission();
     const enabled = permission === "granted";
     setNotificationsEnabled(enabled);
@@ -142,10 +211,23 @@ export function TexasWaiterPanel() {
       return;
     }
     try {
+      const registration = await navigator.serviceWorker.register("/waiter-sw.js", { scope: "/" });
+      const subscription = await registration.pushManager.getSubscription() ?? await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+      const response = await fetch(PUSH_SUBSCRIPTION_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscriptionPayload(subscription)),
+      });
+      if (!response.ok) throw new Error("No se pudo registrar este dispositivo.");
       window.localStorage.setItem(NOTIFICATION_STORAGE_KEY, "true");
       playAlert();
-    } catch {
-      // The notification permission is still active without a sound preview.
+    } catch (subscriptionError) {
+      setNotificationsEnabled(false);
+      setError(subscriptionError instanceof Error ? subscriptionError.message : "No se pudo activar este dispositivo.");
+      return;
     }
     setError("");
   };
@@ -184,6 +266,8 @@ export function TexasWaiterPanel() {
         <button type="button" className={`${styles.bell} ${notificationsEnabled ? styles.bellActive : ""}`} onClick={() => void toggleNotifications()} aria-pressed={notificationsEnabled} aria-label={notificationsEnabled ? "Silenciar alertas del turno" : "Activar alertas del turno"} title={notificationsEnabled ? "Silenciar alertas del turno" : "Activar alertas del turno"}><BellIcon /><span>{notificationsEnabled ? "Alertas activas" : "Alertas silenciadas"}</span></button>
       </div>
     </header>
+
+    {needsHomeScreenInstallation && <p className={styles.installHint} role="status">En iPhone: toca <strong>Compartir</strong>, elige <strong>Añadir a pantalla de inicio</strong> y abre <strong>Texas Meseros</strong> desde el nuevo icono para recibir alertas.</p>}
 
     {error && <p className={styles.error} role="alert">{error}</p>}
     <section className={styles.section} aria-live="polite"><div className={styles.sectionTitle}><h2>Solicitudes activas</h2><span>{isLoading ? "Actualizando…" : "Se actualiza automáticamente"}</span></div>
