@@ -14,7 +14,9 @@ function isTexasMenuPath(pathname: string) {
   return pathname === "/" ||
     pathname === "/texasrestobar" ||
     pathname === "/menu/texasrestobar" ||
+    pathname === "/menu/texasrestobar/icon.png" ||
     pathname === "/waiter/texasrestobar" ||
+    pathname === "/waiter/texasrestobar/icon.png" ||
     pathname === "/login" ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/t/") ||
